@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
+// ── Константы ────────────────────────────────────────────────
 const DAYS = ["Пн","Вт","Ср","Чт","Пт","Сб"];
 const DAYS_FULL = ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
 const MON = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
@@ -18,6 +19,7 @@ const getMonday = d => { const x=new Date(d); const dy=x.getDay(); x.setDate(x.g
 const weekDates = mon => Array.from({length:6},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
 const ds = d => d.toISOString().slice(0,10);
 const sd = s => new Date(s+"T00:00:00");
+const genCode = () => Math.random().toString(36).slice(2,8).toUpperCase();
 
 const SUBJS = [
   {id:"s1",name:"Русский язык",c:0},{id:"s2",name:"Литература",c:1},{id:"s3",name:"Алгебра",c:2},
@@ -28,7 +30,7 @@ const SUBJS = [
 ];
 const INIT = { children:[], subjects:SUBJS, weeklyTemplate:[], dateSchedule:[], homework:[], grades:[], clubs:[] };
 
-// ── Static components ───────────────────────────────────────
+// ── Компоненты ───────────────────────────────────────────────
 const Card = ({cls="",children}) => <div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`}>{children}</div>;
 const Empty = ({txt}) => <Card cls="py-10 text-center text-slate-400 text-sm">{txt}</Card>;
 const ST = ({children}) => <p className="text-sm font-medium text-slate-600 mb-3">{children}</p>;
@@ -45,11 +47,19 @@ const GPicker = ({value,onChange}) => (
   </div>
 );
 
-// ── App ─────────────────────────────────────────────────────
+// Экран загрузки
+const LoadingScreen = ({text="Загрузка..."}) => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+    <p className="text-slate-400 animate-pulse text-lg">{text}</p>
+  </div>
+);
+
+// ── App ──────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser] = useState(undefined); // undefined=загрузка, null=не вошёл
-  const [db_data, setDbData] = useState(null);
-  const [screen, setScreen] = useState("select");
+  const [user, setUser] = useState(undefined);
+  const [userRec, setUserRec] = useState(null);   // {familyId, role, childId?}
+  const [dbData, setDbData] = useState(null);
+  const [setupStep, setSetupStep] = useState("loading"); // loading|login|setup|join|select|app
   const [mode, setMode] = useState("child");
   const [cid, setCid] = useState(null);
   const [tab, setTab] = useState(0);
@@ -58,6 +68,9 @@ export default function App() {
   const [pin, setPin] = useState(""); const [pinErr,setPinErr]=useState(false); const [showPin,setShowPin]=useState(false);
   const [saving, setSaving] = useState(false);
   const [egid, setEgid] = useState(null);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [codeLoading, setCodeLoading] = useState(false);
   const [newChild, setNewChild] = useState({name:"",birthYear:"",schoolYear:""});
   const [lF, setLF] = useState({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
   const [hwF, setHwF] = useState({subjectId:"",lessonId:"",task:"",due:toDay()});
@@ -65,72 +78,132 @@ export default function App() {
   const [clF, setClF] = useState({name:"",day:"Пн",time:""});
   const [sjF, setSjF] = useState("");
   const [editC, setEditC] = useState({});
+  const [showCode, setShowCode] = useState(false);
 
   // Auth listener
   useEffect(()=>{
-    const unsub = onAuthStateChanged(auth, u => {
+    const unsub = onAuthStateChanged(auth, async u => {
       setUser(u);
-      if(!u) setDbData(null);
+      if(!u){ setSetupStep("login"); setDbData(null); setUserRec(null); return; }
+      setSetupStep("loading");
+      try {
+        const uDoc = await getDoc(doc(db,"users",u.uid));
+        if(uDoc.exists()){
+          const rec = uDoc.data();
+          setUserRec(rec);
+          const fDoc = await getDoc(doc(db,"families",rec.familyId));
+          if(fDoc.exists()){
+            setDbData(fDoc.data());
+            // Восстановить childId если был выбран ранее
+            if(rec.childId) setCid(rec.childId);
+            setMode(rec.role==="owner"?"parent":"child");
+            setSetupStep(rec.role==="owner"?"select":"select");
+          } else {
+            setSetupStep("setup");
+          }
+        } else {
+          setSetupStep("setup");
+        }
+      } catch(e){ console.error(e); setSetupStep("setup"); }
     });
     return unsub;
   },[]);
 
-  // Load data from Firestore when user logs in
-  useEffect(()=>{
-    if(!user) return;
-    (async()=>{
-      try {
-        const ref = doc(db, "families", user.uid);
-        const snap = await getDoc(ref);
-        if(snap.exists()) setDbData(snap.data());
-        else {
-          // Попробуем мигрировать из localStorage
-          const local = localStorage.getItem("school-db-v4");
-          const initData = local ? JSON.parse(local) : INIT;
-          await setDoc(ref, initData);
-          setDbData(initData);
-        }
-      } catch(e) {
-        console.error(e);
-        setDbData(INIT);
-      }
-    })();
-  },[user]);
-
   const save = async d => {
     setDbData(d); setSaving(true);
-    try {
-      const ref = doc(db, "families", user.uid);
-      await setDoc(ref, d);
-    } catch(e) { console.error(e); }
-    setTimeout(()=>setSaving(false),600);
+    try { await setDoc(doc(db,"families",userRec.familyId), d); } catch(e){ console.error(e); }
+    setTimeout(()=>setSaving(false), 600);
   };
 
-  const login = async () => {
-    try { await signInWithPopup(auth, provider); }
-    catch(e) { console.error(e); }
-  };
   const logout = async () => {
     await signOut(auth);
-    setScreen("select"); setMode("child"); setCid(null);
+    setSetupStep("login"); setMode("child"); setCid(null); setUserRec(null); setDbData(null);
   };
 
-  // ── Loading screen ──────────────────────────────────────
-  if(user===undefined) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-      <p className="text-slate-400 animate-pulse text-lg">Загрузка...</p>
-    </div>
-  );
+  // Создать семью (родитель)
+  const createFamily = async () => {
+    setCodeLoading(true);
+    try {
+      const code = genCode();
+      const familyId = user.uid;
+      // Мигрируем данные из localStorage если есть
+      const local = localStorage.getItem("school-db-v4");
+      const initData = { ...(local ? JSON.parse(local) : INIT), ownerId:user.uid, familyCode:code, members:[] };
+      await setDoc(doc(db,"families",familyId), initData);
+      await setDoc(doc(db,"familyCodes",code), { familyId });
+      await setDoc(doc(db,"users",user.uid), { familyId, role:"owner" });
+      setUserRec({ familyId, role:"owner" });
+      setDbData(initData);
+      setMode("parent");
+      setSetupStep("select");
+    } catch(e){ console.error(e); }
+    setCodeLoading(false);
+  };
 
-  // ── Login screen ────────────────────────────────────────
-  if(!user) return (
+  // Войти в семью по коду
+  const joinFamily = async () => {
+    const code = codeInput.trim().toUpperCase();
+    if(code.length < 6){ setCodeError("Введи 6-значный код"); return; }
+    setCodeLoading(true); setCodeError("");
+    try {
+      const cDoc = await getDoc(doc(db,"familyCodes",code));
+      if(!cDoc.exists()){ setCodeError("Код не найден. Проверь и попробуй снова"); setCodeLoading(false); return; }
+      const { familyId } = cDoc.data();
+      await updateDoc(doc(db,"families",familyId), { members: arrayUnion(user.uid) });
+      await setDoc(doc(db,"users",user.uid), { familyId, role:"member" });
+      const fDoc = await getDoc(doc(db,"families",familyId));
+      setDbData(fDoc.data());
+      setUserRec({ familyId, role:"member" });
+      setMode("child");
+      setSetupStep("select");
+    } catch(e){ console.error(e); setCodeError("Ошибка. Попробуй снова"); }
+    setCodeLoading(false);
+  };
+
+  const enterParent = () => {
+    if(pin===PIN){ setMode("parent"); setShowPin(false); setPin(""); setPinErr(false); if(!cid&&dbData?.children?.length>0) setCid(dbData.children[0].id); }
+    else setPinErr(true);
+  };
+
+  const selectProfile = async ch => {
+    setCid(ch.id);
+    setMode("child");
+    setSetupStep("app");
+    setTab(0);
+    // Запомнить выбор для членов семьи
+    if(userRec?.role==="member"){
+      try { await setDoc(doc(db,"users",user.uid), {...userRec, childId:ch.id}, {merge:true}); } catch{}
+    }
+  };
+
+  const goSelect = () => { setSetupStep("select"); setMode(userRec?.role==="owner"?"parent":"child"); setCid(null); setTab(0); };
+
+  const addChild = () => {
+    if(!newChild.name.trim()) return;
+    const by=parseInt(newChild.birthYear)||null, sy=parseInt(newChild.schoolYear)||null;
+    const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
+    upd({children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
+    setNewChild({name:"",birthYear:"",schoolYear:""});
+  };
+
+  const remChild = id => {
+    if(!window.confirm("Удалить профиль и все данные?")) return;
+    upd({children:children.filter(c=>c.id!==id),weeklyTemplate:weeklyTemplate.filter(l=>l.childId!==id),dateSchedule:(dateSchedule||[]).filter(l=>l.childId!==id),homework:homework.filter(h=>h.childId!==id),grades:grades.filter(g=>g.childId!==id),clubs:clubs.filter(c=>c.childId!==id)});
+    if(cid===id) setCid(children.filter(c=>c.id!==id)[0]?.id||null);
+  };
+
+  // ── Экран загрузки ───────────────────────────────────────
+  if(setupStep==="loading" || user===undefined) return <LoadingScreen/>;
+
+  // ── Экран входа ──────────────────────────────────────────
+  if(setupStep==="login") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-10 max-w-sm w-full text-center">
         <div className="text-6xl mb-4">📚</div>
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Школьный дневник</h1>
         <p className="text-slate-400 text-sm mb-8">Планировщик для всей семьи</p>
-        <button onClick={login}
-          className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-3 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+        <button onClick={()=>signInWithPopup(auth,provider).catch(console.error)}
+          className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-3 text-sm font-medium hover:bg-slate-50 transition-all shadow-sm">
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -144,31 +217,139 @@ export default function App() {
     </div>
   );
 
-  if(!db_data) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-      <p className="text-slate-400 animate-pulse">Загрузка данных...</p>
+  // ── Экран первичной настройки (новый пользователь) ───────
+  if(setupStep==="setup") return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
+      <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-3">👋</div>
+          <h1 className="text-xl font-bold text-slate-800">Добро пожаловать!</h1>
+          <p className="text-slate-400 text-sm mt-1">{user.email}</p>
+        </div>
+        <p className="text-sm text-slate-600 text-center mb-6">Вы впервые здесь. Что хотите сделать?</p>
+        <div className="space-y-3">
+          <button onClick={createFamily} disabled={codeLoading}
+            className="w-full bg-blue-500 text-white rounded-xl px-6 py-4 text-sm font-medium hover:bg-blue-600 transition-all disabled:opacity-60">
+            {codeLoading?"Создаём...":"👨‍👩‍👧‍👦 Я родитель — создать семью"}
+          </button>
+          <button onClick={()=>setSetupStep("join")}
+            className="w-full bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-4 text-sm font-medium hover:bg-slate-50 transition-all">
+            🎒 Я ребёнок — войти в семью по коду
+          </button>
+        </div>
+        <button onClick={logout} className="w-full text-slate-300 text-xs mt-4 hover:text-slate-400">Выйти</button>
+      </div>
     </div>
   );
 
-  const {children,subjects,weeklyTemplate,dateSchedule,homework,grades,clubs} = db_data;
-  const cbg=idx=>CBG[(idx||0)%CBG.length];
-  const subj=id=>subjects.find(s=>s.id===id);
-  const sc=s=>s?SC[s.c%SC.length]:"bg-slate-100 text-slate-600";
-  const upd=patch=>save({...db_data,...patch});
-  const todayStr=toDay();
+  // ── Экран ввода семейного кода ───────────────────────────
+  if(setupStep==="join") return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
+      <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
+        <button onClick={()=>setSetupStep("setup")} className="text-slate-400 text-sm mb-4 hover:text-slate-600">← Назад</button>
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-3">🔑</div>
+          <h1 className="text-xl font-bold text-slate-800">Войти в семью</h1>
+          <p className="text-slate-400 text-sm mt-1">Попроси родителя назвать код семьи</p>
+        </div>
+        <input
+          className={`w-full border-2 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] uppercase focus:outline-none mb-2 ${codeError?"border-red-400 text-red-500":"border-slate-200 focus:border-blue-400 text-slate-800"}`}
+          placeholder="ABC123"
+          maxLength={6}
+          value={codeInput}
+          onChange={e=>{setCodeInput(e.target.value.toUpperCase());setCodeError("");}}
+          onKeyDown={e=>e.key==="Enter"&&joinFamily()}
+          autoFocus
+        />
+        {codeError && <p className="text-red-500 text-xs text-center mb-3">{codeError}</p>}
+        <button onClick={joinFamily} disabled={codeLoading||codeInput.length<6}
+          className="w-full bg-blue-500 text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-blue-600 disabled:opacity-50 mt-2">
+          {codeLoading?"Проверяем...":"Войти →"}
+        </button>
+        <button onClick={logout} className="w-full text-slate-300 text-xs mt-4 hover:text-slate-400">Выйти</button>
+      </div>
+    </div>
+  );
 
+  // Данные не загружены — ждём
+  if(!dbData) return <LoadingScreen text="Загрузка данных семьи..."/>;
+
+  const {children,subjects,weeklyTemplate,dateSchedule,homework,grades,clubs} = dbData;
+  const cbg = idx => CBG[(idx||0)%CBG.length];
+  const subj = id => subjects.find(s=>s.id===id);
+  const sc = s => s ? SC[s.c%SC.length] : "bg-slate-100 text-slate-600";
+  const upd = patch => save({...dbData,...patch});
+  const todayStr = toDay();
+  const isOwner = userRec?.role==="owner";
+
+  // ── Экран выбора профиля ─────────────────────────────────
+  if(setupStep==="select") return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-slate-700 mb-2">👋 Привет!</h1>
+        <p className="text-slate-400">Выбери свой профиль</p>
+        <p className="text-xs text-slate-300 mt-1">{user.email}</p>
+      </div>
+
+      {children.length===0
+        ? <div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6">
+            <p className="text-slate-400 text-sm">Профилей нет.<br/>{isOwner?"Войдите как родитель и добавьте детей.":"Попросите родителя добавить ваш профиль."}</p>
+          </div>
+        : <div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
+            {children.map(ch=>(
+              <button key={ch.id} onClick={()=>selectProfile(ch)}
+                className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-md active:scale-95 transition-all">
+                <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{ch.name[0].toUpperCase()}</div>
+                <span className="text-slate-700 font-semibold text-sm">{ch.name}</span>
+                {ch.grade&&<span className="text-xs text-slate-400">{ch.grade} класс</span>}
+              </button>
+            ))}
+          </div>
+      }
+
+      <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+        {/* Код семьи — только для родителя */}
+        {isOwner&&(
+          <div className="w-full">
+            <button onClick={()=>setShowCode(v=>!v)}
+              className="w-full bg-white border border-slate-200 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
+              {showCode?"Скрыть код семьи":"🔑 Показать код для детей"}
+            </button>
+            {showCode&&(
+              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                <p className="text-xs text-amber-600 mb-1">Код семьи — дай детям для входа:</p>
+                <p className="text-3xl font-bold tracking-[0.2em] text-amber-800">{dbData.familyCode}</p>
+                <p className="text-xs text-amber-500 mt-1">Вводится один раз при первом входе</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Родительский режим — только для владельца */}
+        {isOwner&&(
+          <button onClick={()=>{setMode("parent");setSetupStep("app");setTab(5);}}
+            className="w-full bg-amber-100 text-amber-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-amber-200">
+            ⚙️ Управление (режим родителя)
+          </button>
+        )}
+
+        <button onClick={logout} className="text-slate-300 text-xs hover:text-slate-400">Выйти из аккаунта</button>
+      </div>
+    </div>
+  );
+
+  // ── Основной экран приложения ────────────────────────────
   const chTpl  = weeklyTemplate.filter(l=>l.childId===cid);
   const chHw   = homework.filter(h=>h.childId===cid);
   const chGr   = grades.filter(g=>g.childId===cid);
   const chCl   = clubs.filter(c=>c.childId===cid);
   const schSubjIds = [...new Set(chTpl.map(l=>l.subjectId))];
-  const schSubjs   = subjects.filter(s=>schSubjIds.includes(s.id));
+  const schSubjs = subjects.filter(s=>schSubjIds.includes(s.id));
 
   const lessonsFor = dateStr => {
-    const d=sd(dateStr), di=(d.getDay()+6)%7;
+    const d=sd(dateStr),di=(d.getDay()+6)%7;
     if(di>=6) return [];
-    const dayKey=DAYS[di];
-    return [...chTpl.filter(l=>l.day===dayKey), ...(dateSchedule||[]).filter(l=>l.childId===cid&&l.date===dateStr)]
+    return [...chTpl.filter(l=>l.day===DAYS[di]),...(dateSchedule||[]).filter(l=>l.childId===cid&&l.date===dateStr)]
       .sort((a,b)=>(+a.lessonNum||99)-(+b.lessonNum||99));
   };
 
@@ -211,32 +392,10 @@ export default function App() {
   };
   const SBadge = ({sid}) => { const s=subj(sid); return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>; };
 
-  const enterParent = () => {
-    if(pin===PIN){ setMode("parent"); setShowPin(false); setPin(""); setPinErr(false); if(!cid&&children.length>0) setCid(children[0].id); if(screen==="select") setScreen("app"); }
-    else setPinErr(true);
-  };
-  const goSelect = () => { setScreen("select"); setMode("child"); setCid(null); setTab(0); };
-  const addChild = () => {
-    if(!newChild.name.trim()) return;
-    const by=parseInt(newChild.birthYear)||null, sy=parseInt(newChild.schoolYear)||null;
-    const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
-    upd({children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
-    setNewChild({name:"",birthYear:"",schoolYear:""});
-  };
-  const remChild = id => {
-    if(!window.confirm("Удалить профиль и все данные?")) return;
-    upd({children:children.filter(c=>c.id!==id),weeklyTemplate:weeklyTemplate.filter(l=>l.childId!==id),dateSchedule:(dateSchedule||[]).filter(l=>l.childId!==id),homework:homework.filter(h=>h.childId!==id),grades:grades.filter(g=>g.childId!==id),clubs:clubs.filter(c=>c.childId!==id)});
-    if(cid===id) setCid(children.filter(c=>c.id!==id)[0]?.id||null);
-  };
-
-  const TABS = mode==="parent"
-    ? ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Дети"]
-    : ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки"];
-
   const PinModal = () => (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 w-72 shadow-xl">
-        <h2 className="font-bold text-lg mb-1">Вход для родителя</h2>
+        <h2 className="font-bold text-lg mb-1">Режим родителя</h2>
         <p className="text-slate-400 text-sm mb-3">Введите PIN-код</p>
         <input type="password" maxLength={4}
           className={`border-2 rounded-xl px-4 py-3 text-center text-xl w-full tracking-widest focus:outline-none ${pinErr?"border-red-400":"border-slate-200 focus:border-blue-400"}`}
@@ -251,52 +410,26 @@ export default function App() {
     </div>
   );
 
-  // ── SELECT screen ───────────────────────────────────────
-  if(screen==="select") return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-slate-700 mb-2">👋 Привет!</h1>
-        <p className="text-slate-400">Выбери свой профиль</p>
-        <p className="text-xs text-slate-300 mt-1">{user.email}</p>
-      </div>
-      {children.length===0
-        ? <div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6"><p className="text-slate-400 text-sm">Профилей нет.<br/>Войдите как родитель и добавьте детей.</p></div>
-        : <div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-8">
-            {children.map(ch=>(
-              <button key={ch.id} onClick={()=>{setCid(ch.id);setMode("child");setScreen("app");setTab(0);}}
-                className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-md active:scale-95 transition-all">
-                <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{ch.name[0].toUpperCase()}</div>
-                <span className="text-slate-700 font-semibold text-sm">{ch.name}</span>
-                {ch.grade&&<span className="text-xs text-slate-400">{ch.grade} класс</span>}
-                {ch.birthYear&&!ch.grade&&<span className="text-xs text-slate-400">{ch.birthYear} г.р.</span>}
-              </button>
-            ))}
-          </div>
-      }
-      <div className="flex flex-col items-center gap-3">
-        <button onClick={()=>setShowPin(true)} className="bg-white border border-slate-200 text-slate-600 rounded-xl px-6 py-3 text-sm font-medium hover:bg-slate-50 shadow-sm">🔑 Я родитель</button>
-        <button onClick={logout} className="text-slate-300 text-xs hover:text-slate-400">Выйти из аккаунта</button>
-      </div>
-      {showPin&&<PinModal/>}
-    </div>
-  );
+  const activeCh = children.find(c=>c.id===cid);
+  const TABS = mode==="parent"
+    ? ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Дети"]
+    : ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки"];
 
-  // ── APP screen ──────────────────────────────────────────
   const activeLessons = lessonsFor(aDate);
   const hwDateLessons = lessonsFor(hwF.due);
   const hwSjIds = hwDateLessons.length ? [...new Set(hwDateLessons.map(l=>l.subjectId))] : schSubjIds;
-  const activeCh = children.find(c=>c.id===cid);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans" onClick={()=>egid&&setEgid(null)}>
       <div className="max-w-2xl mx-auto p-4" onClick={e=>e.stopPropagation()}>
 
+        {/* Шапка */}
         <div className="flex items-center gap-2 mb-4">
           <button onClick={goSelect} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
           {mode==="parent"
             ? <div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
                 {children.map(ch=>(
-                  <button key={ch.id} onClick={()=>setCid(ch.id)}
+                  <button key={ch.id} onClick={()=>{setCid(ch.id);setTab(0);}}
                     className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${cid===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
                     <span className="font-bold">{ch.name[0]}</span><span>{ch.name}</span>
                   </button>
@@ -308,14 +441,13 @@ export default function App() {
               </div>
           }
           <span className="text-xs text-slate-300">{saving?"💾":"✅"}</span>
-          {mode==="child"
-            ? <button onClick={()=>setShowPin(true)} className="bg-slate-100 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium">🔑</button>
-            : <button onClick={()=>setMode("child")} className="bg-amber-100 text-amber-700 rounded-xl px-3 py-1.5 text-xs font-medium">👨‍👩‍👧‍👦</button>
-          }
+          {mode==="child"&&isOwner&&<button onClick={()=>setShowPin(true)} className="bg-slate-100 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium">🔑</button>}
+          {mode==="parent"&&<button onClick={()=>setMode("child")} className="bg-amber-100 text-amber-700 rounded-xl px-3 py-1.5 text-xs font-medium">👨‍👩‍👧‍👦</button>}
         </div>
 
         {showPin&&<PinModal/>}
 
+        {/* Табы */}
         <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
           {TABS.map((t,i)=>(
             <button key={i} onClick={()=>setTab(i)}
@@ -325,20 +457,20 @@ export default function App() {
           ))}
         </div>
 
+        {/* ══ РАСПИСАНИЕ ══ */}
         {tab===0&&(
           <div>
             <div className="flex items-center justify-between mb-3">
-              <button onClick={()=>{ const m=new Date(mon); m.setDate(m.getDate()-7); setMon(m); }} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
+              <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
               <div className="text-center">
                 <p className="text-sm font-semibold text-slate-700">{wLabel}</p>
                 {ds(mon)!==ds(getMonday(new Date()))&&<button onClick={()=>{setMon(getMonday(new Date()));setADate(toDay());}} className="text-xs text-blue-500 hover:underline">← сегодня</button>}
               </div>
-              <button onClick={()=>{ const m=new Date(mon); m.setDate(m.getDate()+7); setMon(m); }} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
+              <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
             </div>
             <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
               {wDates.map((d,i)=>{
-                const dstr=ds(d), isToday=dstr===todayStr, isActive=dstr===aDate;
-                const has=lessonsFor(dstr).length>0;
+                const dstr=ds(d),isToday=dstr===todayStr,isActive=dstr===aDate,has=lessonsFor(dstr).length>0;
                 return (
                   <button key={i} onClick={()=>setADate(dstr)}
                     className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-blue-500 text-white shadow-md":isToday?"bg-blue-100 text-blue-700 border-2 border-blue-300":"bg-white text-slate-600 hover:bg-slate-100"}`}>
@@ -357,10 +489,9 @@ export default function App() {
               {activeLessons.length===0
                 ? <p className="text-slate-400 text-sm text-center py-4">Уроков нет</p>
                 : activeLessons.map(l=>{
-                    const s=subj(l.subjectId);
+                    const s=subj(l.subjectId),isOnce=!!l.date;
                     const lHw=chHw.filter(h=>h.subjectId===l.subjectId&&(h.date===aDate||h.lessonId===l.id));
                     const lGr=sjGrades(l.subjectId).slice(0,3);
-                    const isOnce=!!l.date;
                     return (
                       <div key={l.id} className="mb-2 flex items-center gap-2 p-2.5 rounded-xl bg-slate-50">
                         <span className="text-slate-400 text-xs w-5 text-center font-bold">{l.lessonNum}</span>
@@ -369,7 +500,7 @@ export default function App() {
                         {isOnce&&<span className="text-purple-400 text-xs">📌</span>}
                         {lHw.some(h=>!h.done)&&<span className="text-orange-400 text-xs">📝</span>}
                         {lGr[0]&&<GBadge v={lGr[0].value}/>}
-                        {mode==="parent"&&<button onClick={()=>{ isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)}); }} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                        {mode==="parent"&&<button onClick={()=>isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
                       </div>
                     );
                   })
@@ -414,6 +545,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ══ ЗАДАНИЯ ══ */}
         {tab===1&&(
           <div>
             <div className="space-y-3 mb-4">
@@ -462,13 +594,12 @@ export default function App() {
                   <Sel cls="w-full" value={hwF.lessonId} onChange={e=>setHwF(p=>({...p,lessonId:e.target.value}))}>
                     <option value="">Привязать к уроку (необязательно)</option>
                     {hwDateLessons.filter(l=>!hwF.subjectId||l.subjectId===hwF.subjectId).map(l=>{
-                      const s=subj(l.subjectId);
-                      const dname=DAYS_FULL[DAYS.indexOf(DAYS[Math.min((sd(hwF.due).getDay()+6)%7,5)])];
-                      return <option key={l.id} value={l.id}>{[dname,l.lessonNum&&`${l.lessonNum} урок`,l.time].filter(Boolean).join(", ")} — {s?.name}</option>;
+                      const s=subj(l.subjectId),dn=DAYS_FULL[DAYS.indexOf(DAYS[Math.min((sd(hwF.due).getDay()+6)%7,5)])];
+                      return <option key={l.id} value={l.id}>{[dn,l.lessonNum&&`${l.lessonNum} урок`,l.time].filter(Boolean).join(", ")} — {s?.name}</option>;
                     })}
                   </Sel>
                   <div className="flex gap-2 items-end">
-                    <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" placeholder="Что задали? Можно писать целыми предложениями..." rows={2}
+                    <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" placeholder="Что задали?" rows={2}
                       value={hwF.task} onChange={e=>setHwF(p=>({...p,task:e.target.value}))}/>
                     <Btn onClick={()=>{
                       if(!hwF.subjectId||!hwF.task.trim()) return;
@@ -482,13 +613,14 @@ export default function App() {
           </div>
         )}
 
+        {/* ══ ОЦЕНКИ ══ */}
         {tab===2&&(
           <div>
             {mode==="parent"&&<p className="text-xs text-slate-400 mb-3 text-center">Нажмите на оценку для изменения</p>}
             <div className="space-y-3 mb-4">
               {schSubjs.some(s=>sjGrades(s.id).length>0)
-                ?schSubjs.filter(s=>sjGrades(s.id).length>0).map(s=>{
-                    const gs=sjGrades(s.id), av=avg(s.id);
+                ? schSubjs.filter(s=>sjGrades(s.id).length>0).map(s=>{
+                    const gs=sjGrades(s.id),av=avg(s.id);
                     return (
                       <Card key={s.id}>
                         <div className="flex items-center gap-2 mb-3">
@@ -499,41 +631,42 @@ export default function App() {
                       </Card>
                     );
                   })
-                :<Empty txt="Оценок ещё нет"/>
+                : <Empty txt="Оценок ещё нет"/>
               }
             </div>
             {mode==="parent"&&(
               <Card>
                 <ST>Добавить оценку</ST>
                 {schSubjs.length===0
-                  ?<p className="text-xs text-slate-400 text-center py-2">Сначала добавьте предметы в расписание</p>
-                  :<div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Sel cls="flex-1" value={grF.subjectId} onChange={e=>setGrF(p=>({...p,subjectId:e.target.value}))}>
-                        <option value="">Предмет...</option>
-                        {schSubjs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                      </Sel>
-                      <Sel cls="w-28" value={grF.type} onChange={e=>setGrF(p=>({...p,type:e.target.value}))}>
-                        <option value="class">Устный</option><option value="test">Контр.</option>
-                      </Sel>
+                  ? <p className="text-xs text-slate-400 text-center py-2">Сначала добавьте предметы в расписание</p>
+                  : <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Sel cls="flex-1" value={grF.subjectId} onChange={e=>setGrF(p=>({...p,subjectId:e.target.value}))}>
+                          <option value="">Предмет...</option>
+                          {schSubjs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                        </Sel>
+                        <Sel cls="w-28" value={grF.type} onChange={e=>setGrF(p=>({...p,type:e.target.value}))}>
+                          <option value="class">Устный</option><option value="test">Контр.</option>
+                        </Sel>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <GPicker value={grF.value} onChange={v=>setGrF(p=>({...p,value:v||"5"}))}/>
+                        <Inp type="date" cls="flex-1" value={grF.date} onChange={e=>setGrF(p=>({...p,date:e.target.value}))}/>
+                        <Btn onClick={()=>{if(!grF.subjectId||!grF.value)return;upd({grades:[...grades,{id:uid(),childId:cid,...grF,hwId:null}]});setGrF(p=>({...p,subjectId:"",value:"5",date:toDay()}));}} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <GPicker value={grF.value} onChange={v=>setGrF(p=>({...p,value:v||"5"}))}/>
-                      <Inp type="date" cls="flex-1" value={grF.date} onChange={e=>setGrF(p=>({...p,date:e.target.value}))}/>
-                      <Btn onClick={()=>{if(!grF.subjectId||!grF.value)return;upd({grades:[...grades,{id:uid(),childId:cid,...grF,hwId:null}]});setGrF(p=>({...p,subjectId:"",value:"5",date:toDay()}));}} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
-                    </div>
-                  </div>
                 }
               </Card>
             )}
           </div>
         )}
 
+        {/* ══ КРУЖКИ ══ */}
         {tab===3&&(
           <div>
             <div className="space-y-3 mb-4">
               {chCl.length===0?<Empty txt="Кружки не добавлены"/>
-                :chCl.map(c=>(
+                : chCl.map(c=>(
                   <Card key={c.id} cls={c.done?"opacity-70":""}>
                     <div className="flex items-center gap-3">
                       <button onClick={()=>upd({clubs:clubs.map(x=>x.id===c.id?{...x,done:!x.done}:x)})}
@@ -574,29 +707,30 @@ export default function App() {
           </div>
         )}
 
+        {/* ══ ПРЕДМЕТЫ ══ */}
         {tab===4&&mode==="parent"&&(
           <div>
             <Card cls="mb-4">
               <ST>Предметы в расписании {activeCh?.name}</ST>
               {schSubjs.length===0
-                ?<p className="text-slate-400 text-sm text-center py-4">Нет — добавьте уроки в расписание</p>
-                :<div className="space-y-2">
-                  {schSubjs.map(s=>{
-                    const av=avg(s.id);
-                    return (
-                      <div key={s.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50">
-                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
-                        <span className="text-xs text-slate-400">{chTpl.filter(l=>l.subjectId===s.id).length} ур/нед</span>
-                        <span className="text-xs text-slate-400">{chHw.filter(h=>h.subjectId===s.id).length} дз</span>
-                        {av&&<span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср {av}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
+                ? <p className="text-slate-400 text-sm text-center py-4">Нет — добавьте уроки в расписание</p>
+                : <div className="space-y-2">
+                    {schSubjs.map(s=>{
+                      const av=avg(s.id);
+                      return (
+                        <div key={s.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50">
+                          <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
+                          <span className="text-xs text-slate-400">{chTpl.filter(l=>l.subjectId===s.id).length} ур/нед</span>
+                          <span className="text-xs text-slate-400">{chHw.filter(h=>h.subjectId===s.id).length} дз</span>
+                          {av&&<span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср {av}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
               }
             </Card>
             <Card>
-              <ST>Добавить предмет в каталог</ST>
+              <ST>Добавить предмет</ST>
               <div className="flex gap-2">
                 <Inp cls="flex-1" placeholder="Название предмета" value={sjF} onChange={e=>setSjF(e.target.value)}
                   onKeyDown={e=>{if(e.key==="Enter"&&sjF.trim()){upd({subjects:[...subjects,{id:uid(),name:sjF.trim(),c:subjects.length%SC.length}]});setSjF("");}}}/>
@@ -606,18 +740,33 @@ export default function App() {
           </div>
         )}
 
+        {/* ══ ДЕТИ ══ */}
         {tab===5&&mode==="parent"&&(
           <div>
+            {/* Код семьи */}
+            <Card cls="mb-4 bg-amber-50 border border-amber-100">
+              <ST>🔑 Код семьи</ST>
+              <div className="flex items-center justify-between">
+                <p className="text-3xl font-bold tracking-[0.2em] text-amber-800">{dbData.familyCode}</p>
+                <div className="text-right">
+                  <p className="text-xs text-amber-600">Дай этот код ребёнку</p>
+                  <p className="text-xs text-amber-500">при первом входе через Google</p>
+                </div>
+              </div>
+            </Card>
+
             <div className="space-y-3 mb-4">
               {children.length===0?<Empty txt="Детей нет — добавьте первого"/>
-                :children.map(ch=>(
+                : children.map(ch=>(
                   <Card key={ch.id}>
                     <div className="flex items-center gap-3">
                       <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold`}>{ch.name[0].toUpperCase()}</div>
                       <div className="flex-1">
                         <p className="font-semibold text-slate-700">{ch.name}</p>
                         <p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р.`}{ch.birthYear&&ch.grade?" · ":""}{ch.grade&&`${ch.grade} класс`}</p>
-                        <p className="text-xs text-slate-400">{weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий · {clubs.filter(c=>c.childId===ch.id).length} кружков</p>
+                        <p className="text-xs text-slate-400">
+                          {weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий
+                        </p>
                       </div>
                       <button onClick={()=>remChild(ch.id)} className="text-slate-300 hover:text-red-400 text-lg">×</button>
                     </div>
