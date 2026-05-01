@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
 // ── Константы ────────────────────────────────────────────────
@@ -160,7 +160,23 @@ export default function App() {
     setCodeLoading(false);
   };
 
-  const enterParent = () => {
+  const deleteFamily = async () => {
+    const confirmed = window.confirm(
+      "Вы уверены? Это удалит ВСЕ данные семьи:\n— расписание\n— домашние задания\n— оценки\n— профили детей\n\nОтменить будет невозможно!"
+    );
+    if (!confirmed) return;
+    const confirmed2 = window.confirm("Последнее предупреждение. Удалить всё безвозвратно?");
+    if (!confirmed2) return;
+    try {
+      const { familyId } = userRec;
+      await deleteDoc(doc(db, "families", familyId));
+      await deleteDoc(doc(db, "familyCodes", dbData.familyCode));
+      await deleteDoc(doc(db, "users", user.uid));
+      setDbData(null);
+      setUserRec(null);
+      setSetupStep("setup");
+    } catch(e) { console.error(e); alert("Ошибка при удалении. Попробуй снова."); }
+  };
     if(pin===PIN){ setMode("parent"); setShowPin(false); setPin(""); setPinErr(false); if(!cid&&dbData?.children?.length>0) setCid(dbData.children[0].id); }
     else setPinErr(true);
   };
@@ -743,6 +759,15 @@ export default function App() {
         {/* ══ ДЕТИ ══ */}
         {tab===5&&mode==="parent"&&(
           <div>
+            <Card cls="mb-4 border border-red-100">
+              <ST>⚠️ Опасная зона</ST>
+              <p className="text-xs text-slate-400 mb-3">Удаление семьи сотрёт все данные: расписание, задания, оценки, профили детей. Отменить невозможно.</p>
+              <button onClick={deleteFamily}
+                className="w-full bg-red-50 text-red-500 border border-red-200 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-100 transition-all">
+                🗑 Удалить семью и все данные
+              </button>
+            </Card>
+
             {/* Код семьи */}
             <Card cls="mb-4 bg-amber-50 border border-amber-100">
               <ST>🔑 Код семьи</ST>
