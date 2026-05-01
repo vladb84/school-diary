@@ -3,14 +3,12 @@ import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
-// ── Константы ────────────────────────────────────────────────
 const DAYS = ["Пн","Вт","Ср","Чт","Пт","Сб"];
 const DAYS_FULL = ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
 const MON = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const GC = {"5":"bg-green-100 text-green-700","4":"bg-blue-100 text-blue-700","3":"bg-yellow-100 text-yellow-700","2":"bg-red-100 text-red-700"};
 const SC = ["bg-blue-100 text-blue-800","bg-purple-100 text-purple-800","bg-emerald-100 text-emerald-800","bg-amber-100 text-amber-800","bg-pink-100 text-pink-800","bg-indigo-100 text-indigo-800","bg-orange-100 text-orange-800","bg-teal-100 text-teal-800","bg-red-100 text-red-800","bg-cyan-100 text-cyan-800","bg-lime-100 text-lime-800","bg-rose-100 text-rose-800","bg-violet-100 text-violet-800","bg-sky-100 text-sky-800","bg-green-100 text-green-800"];
 const CBG = ["bg-blue-500","bg-pink-500","bg-emerald-500","bg-violet-500","bg-orange-500","bg-teal-500"];
-const PIN = "1234";
 const uid = () => Math.random().toString(36).slice(2,9);
 const toDay = () => new Date().toISOString().slice(0,10);
 const lessonTime = n => { const m=8*60+(n-1)*60,h=Math.floor(m/60),mm=m%60; return (h<0||h>23)?"":`${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; };
@@ -30,7 +28,6 @@ const SUBJS = [
 ];
 const INIT = { children:[], subjects:SUBJS, weeklyTemplate:[], dateSchedule:[], homework:[], grades:[], clubs:[] };
 
-// ── Компоненты ───────────────────────────────────────────────
 const Card = ({cls="",children}) => <div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`}>{children}</div>;
 const Empty = ({txt}) => <Card cls="py-10 text-center text-slate-400 text-sm">{txt}</Card>;
 const ST = ({children}) => <p className="text-sm font-medium text-slate-600 mb-3">{children}</p>;
@@ -42,30 +39,25 @@ const GPicker = ({value,onChange}) => (
   <div className="flex gap-1">
     {["5","4","3","2"].map(g=>(
       <button key={g} onClick={()=>onChange(value===g?null:g)}
-        className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-all ${value===g?(GC[g]||"")+" border-current ring-1 ring-offset-1 ring-current":"bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400"}`}>{g}</button>
+        className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-all ${value===g?(GC[g]||"")+" border-current ring-1 ring-offset-1 ring-current":"bg-slate-50 text-slate-500 border-slate-200 hover:border-slate.400"}`}>{g}</button>
     ))}
   </div>
 );
-
-// Экран загрузки
 const LoadingScreen = ({text="Загрузка..."}) => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
     <p className="text-slate-400 animate-pulse text-lg">{text}</p>
   </div>
 );
 
-// ── App ──────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(undefined);
-  const [userRec, setUserRec] = useState(null);   // {familyId, role, childId?}
+  const [userRec, setUserRec] = useState(null);
   const [dbData, setDbData] = useState(null);
-  const [setupStep, setSetupStep] = useState("loading"); // loading|login|setup|join|select|app
-  const [mode, setMode] = useState("child");
+  const [setupStep, setSetupStep] = useState("loading");
   const [cid, setCid] = useState(null);
   const [tab, setTab] = useState(0);
   const [mon, setMon] = useState(() => getMonday(new Date()));
   const [aDate, setADate] = useState(toDay);
-  const [pin, setPin] = useState(""); const [pinErr,setPinErr]=useState(false); const [showPin,setShowPin]=useState(false);
   const [saving, setSaving] = useState(false);
   const [egid, setEgid] = useState(null);
   const [codeInput, setCodeInput] = useState("");
@@ -80,7 +72,6 @@ export default function App() {
   const [editC, setEditC] = useState({});
   const [showCode, setShowCode] = useState(false);
 
-  // Auth listener
   useEffect(()=>{
     const unsub = onAuthStateChanged(auth, async u => {
       setUser(u);
@@ -94,10 +85,8 @@ export default function App() {
           const fDoc = await getDoc(doc(db,"families",rec.familyId));
           if(fDoc.exists()){
             setDbData(fDoc.data());
-            // Восстановить childId если был выбран ранее
             if(rec.childId) setCid(rec.childId);
-            setMode(rec.role==="owner"?"parent":"child");
-            setSetupStep(rec.role==="owner"?"select":"select");
+            setSetupStep("select");
           } else {
             setSetupStep("setup");
           }
@@ -117,16 +106,14 @@ export default function App() {
 
   const logout = async () => {
     await signOut(auth);
-    setSetupStep("login"); setMode("child"); setCid(null); setUserRec(null); setDbData(null);
+    setSetupStep("login"); setCid(null); setUserRec(null); setDbData(null);
   };
 
-  // Создать семью (родитель)
   const createFamily = async () => {
     setCodeLoading(true);
     try {
       const code = genCode();
       const familyId = user.uid;
-      // Мигрируем данные из localStorage если есть
       const local = localStorage.getItem("school-db-v4");
       const initData = { ...(local ? JSON.parse(local) : INIT), ownerId:user.uid, familyCode:code, members:[] };
       await setDoc(doc(db,"families",familyId), initData);
@@ -134,13 +121,11 @@ export default function App() {
       await setDoc(doc(db,"users",user.uid), { familyId, role:"owner" });
       setUserRec({ familyId, role:"owner" });
       setDbData(initData);
-      setMode("parent");
       setSetupStep("select");
     } catch(e){ console.error(e); }
     setCodeLoading(false);
   };
 
-  // Войти в семью по коду
   const joinFamily = async () => {
     const code = codeInput.trim().toUpperCase();
     if(code.length < 6){ setCodeError("Введи 6-значный код"); return; }
@@ -154,45 +139,34 @@ export default function App() {
       const fDoc = await getDoc(doc(db,"families",familyId));
       setDbData(fDoc.data());
       setUserRec({ familyId, role:"member" });
-      setMode("child");
       setSetupStep("select");
     } catch(e){ console.error(e); setCodeError("Ошибка. Попробуй снова"); }
     setCodeLoading(false);
   };
 
-  const deleteFamily = async () => {
-    const confirmed = window.confirm(
-      "Вы уверены? Это удалит ВСЕ данные семьи:\n— расписание\n— домашние задания\n— оценки\n— профили детей\n\nОтменить будет невозможно!"
-    );
-    if (!confirmed) return;
-    const confirmed2 = window.confirm("Последнее предупреждение. Удалить всё безвозвратно?");
-    if (!confirmed2) return;
-    try {
-      const { familyId } = userRec;
-      await deleteDoc(doc(db, "families", familyId));
-      await deleteDoc(doc(db, "familyCodes", dbData.familyCode));
-      await deleteDoc(doc(db, "users", user.uid));
-      setDbData(null);
-      setUserRec(null);
-      setSetupStep("setup");
-    } catch(e) { console.error(e); alert("Ошибка при удалении. Попробуй снова."); }
-  };
-    if(pin===PIN){ setMode("parent"); setShowPin(false); setPin(""); setPinErr(false); if(!cid&&dbData?.children?.length>0) setCid(dbData.children[0].id); }
-    else setPinErr(true);
-  };
-
   const selectProfile = async ch => {
     setCid(ch.id);
-    setMode("child");
     setSetupStep("app");
     setTab(0);
-    // Запомнить выбор для членов семьи
     if(userRec?.role==="member"){
       try { await setDoc(doc(db,"users",user.uid), {...userRec, childId:ch.id}, {merge:true}); } catch{}
     }
   };
 
-  const goSelect = () => { setSetupStep("select"); setMode(userRec?.role==="owner"?"parent":"child"); setCid(null); setTab(0); };
+  const goSelect = () => { setSetupStep("select"); setCid(null); setTab(0); };
+
+  const deleteFamily = async () => {
+    const c1 = window.confirm("Вы уверены? Это удалит ВСЕ данные семьи:\n— расписание\n— домашние задания\n— оценки\n— профили детей\n\nОтменить будет невозможно!");
+    if(!c1) return;
+    const c2 = window.confirm("Последнее предупреждение. Удалить всё безвозвратно?");
+    if(!c2) return;
+    try {
+      await deleteDoc(doc(db,"families",userRec.familyId));
+      await deleteDoc(doc(db,"familyCodes",dbData.familyCode));
+      await deleteDoc(doc(db,"users",user.uid));
+      setDbData(null); setUserRec(null); setSetupStep("setup");
+    } catch(e){ console.error(e); alert("Ошибка при удалении."); }
+  };
 
   const addChild = () => {
     if(!newChild.name.trim()) return;
@@ -208,10 +182,9 @@ export default function App() {
     if(cid===id) setCid(children.filter(c=>c.id!==id)[0]?.id||null);
   };
 
-  // ── Экран загрузки ───────────────────────────────────────
-  if(setupStep==="loading" || user===undefined) return <LoadingScreen/>;
+  // ── Экраны ──────────────────────────────────────────────────
+  if(setupStep==="loading"||user===undefined) return <LoadingScreen/>;
 
-  // ── Экран входа ──────────────────────────────────────────
   if(setupStep==="login") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-10 max-w-sm w-full text-center">
@@ -233,7 +206,6 @@ export default function App() {
     </div>
   );
 
-  // ── Экран первичной настройки (новый пользователь) ───────
   if(setupStep==="setup") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
@@ -242,7 +214,7 @@ export default function App() {
           <h1 className="text-xl font-bold text-slate-800">Добро пожаловать!</h1>
           <p className="text-slate-400 text-sm mt-1">{user.email}</p>
         </div>
-        <p className="text-sm text-slate-600 text-center mb-6">Вы впервые здесь. Что хотите сделать?</p>
+        <p className="text-sm text-slate-500 text-center mb-6">Вы впервые здесь. Что хотите сделать?</p>
         <div className="space-y-3">
           <button onClick={createFamily} disabled={codeLoading}
             className="w-full bg-blue-500 text-white rounded-xl px-6 py-4 text-sm font-medium hover:bg-blue-600 transition-all disabled:opacity-60">
@@ -250,7 +222,7 @@ export default function App() {
           </button>
           <button onClick={()=>setSetupStep("join")}
             className="w-full bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-4 text-sm font-medium hover:bg-slate-50 transition-all">
-            🎒 Я ребёнок — войти в семью по коду
+            🎒 Я ребёнок — войти по коду
           </button>
         </div>
         <button onClick={logout} className="w-full text-slate-300 text-xs mt-4 hover:text-slate-400">Выйти</button>
@@ -258,7 +230,6 @@ export default function App() {
     </div>
   );
 
-  // ── Экран ввода семейного кода ───────────────────────────
   if(setupStep==="join") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
@@ -270,14 +241,10 @@ export default function App() {
         </div>
         <input
           className={`w-full border-2 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] uppercase focus:outline-none mb-2 ${codeError?"border-red-400 text-red-500":"border-slate-200 focus:border-blue-400 text-slate-800"}`}
-          placeholder="ABC123"
-          maxLength={6}
-          value={codeInput}
+          placeholder="ABC123" maxLength={6} value={codeInput}
           onChange={e=>{setCodeInput(e.target.value.toUpperCase());setCodeError("");}}
-          onKeyDown={e=>e.key==="Enter"&&joinFamily()}
-          autoFocus
-        />
-        {codeError && <p className="text-red-500 text-xs text-center mb-3">{codeError}</p>}
+          onKeyDown={e=>e.key==="Enter"&&joinFamily()} autoFocus/>
+        {codeError&&<p className="text-red-500 text-xs text-center mb-3">{codeError}</p>}
         <button onClick={joinFamily} disabled={codeLoading||codeInput.length<6}
           className="w-full bg-blue-500 text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-blue-600 disabled:opacity-50 mt-2">
           {codeLoading?"Проверяем...":"Войти →"}
@@ -287,29 +254,28 @@ export default function App() {
     </div>
   );
 
-  // Данные не загружены — ждём
   if(!dbData) return <LoadingScreen text="Загрузка данных семьи..."/>;
 
   const {children,subjects,weeklyTemplate,dateSchedule,homework,grades,clubs} = dbData;
+  const isOwner = userRec?.role === "owner";
   const cbg = idx => CBG[(idx||0)%CBG.length];
   const subj = id => subjects.find(s=>s.id===id);
   const sc = s => s ? SC[s.c%SC.length] : "bg-slate-100 text-slate-600";
   const upd = patch => save({...dbData,...patch});
   const todayStr = toDay();
-  const isOwner = userRec?.role==="owner";
 
-  // ── Экран выбора профиля ─────────────────────────────────
   if(setupStep==="select") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-slate-700 mb-2">👋 Привет!</h1>
         <p className="text-slate-400">Выбери свой профиль</p>
         <p className="text-xs text-slate-300 mt-1">{user.email}</p>
+        {isOwner&&<span className="inline-block mt-2 bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full">👨‍👩‍👧‍👦 Родитель</span>}
       </div>
 
       {children.length===0
         ? <div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6">
-            <p className="text-slate-400 text-sm">Профилей нет.<br/>{isOwner?"Войдите как родитель и добавьте детей.":"Попросите родителя добавить ваш профиль."}</p>
+            <p className="text-slate-400 text-sm">{isOwner?"Добавьте профили детей в разделе управления.":"Попросите родителя добавить ваш профиль."}</p>
           </div>
         : <div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
             {children.map(ch=>(
@@ -324,37 +290,31 @@ export default function App() {
       }
 
       <div className="flex flex-col items-center gap-3 w-full max-w-xs">
-        {/* Код семьи — только для родителя */}
         {isOwner&&(
-          <div className="w-full">
+          <>
             <button onClick={()=>setShowCode(v=>!v)}
               className="w-full bg-white border border-slate-200 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
-              {showCode?"Скрыть код семьи":"🔑 Показать код для детей"}
+              {showCode?"Скрыть код":"🔑 Показать код для детей"}
             </button>
             {showCode&&(
-              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-                <p className="text-xs text-amber-600 mb-1">Код семьи — дай детям для входа:</p>
+              <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                <p className="text-xs text-amber-600 mb-1">Код семьи:</p>
                 <p className="text-3xl font-bold tracking-[0.2em] text-amber-800">{dbData.familyCode}</p>
                 <p className="text-xs text-amber-500 mt-1">Вводится один раз при первом входе</p>
               </div>
             )}
-          </div>
+            <button onClick={()=>{setSetupStep("app");setTab(5);}}
+              className="w-full bg-amber-100 text-amber-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-amber-200">
+              ⚙️ Управление семьёй
+            </button>
+          </>
         )}
-
-        {/* Родительский режим — только для владельца */}
-        {isOwner&&(
-          <button onClick={()=>{setMode("parent");setSetupStep("app");setTab(5);}}
-            className="w-full bg-amber-100 text-amber-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-amber-200">
-            ⚙️ Управление (режим родителя)
-          </button>
-        )}
-
         <button onClick={logout} className="text-slate-300 text-xs hover:text-slate-400">Выйти из аккаунта</button>
       </div>
     </div>
   );
 
-  // ── Основной экран приложения ────────────────────────────
+  // ── Основной экран ───────────────────────────────────────────
   const chTpl  = weeklyTemplate.filter(l=>l.childId===cid);
   const chHw   = homework.filter(h=>h.childId===cid);
   const chGr   = grades.filter(g=>g.childId===cid);
@@ -389,12 +349,12 @@ export default function App() {
     const isE=egid===g.id;
     return (
       <div className="relative">
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs cursor-pointer ${GC[g.value]||"bg-slate-100"} ${mode==="parent"?"hover:ring-2 hover:ring-offset-1 hover:ring-current":""}`}
-          onClick={e=>{e.stopPropagation();mode==="parent"&&setEgid(isE?null:g.id);}}>
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs cursor-pointer ${GC[g.value]||"bg-slate-100"} ${isOwner?"hover:ring-2 hover:ring-offset-1 hover:ring-current":""}`}
+          onClick={e=>{e.stopPropagation();isOwner&&setEgid(isE?null:g.id);}}>
           <span className="font-bold text-sm">{g.value}</span>
           <span className="opacity-60">{g.type==="hw"?"дз":g.type==="test"?"к/р":"уст"}</span>
           {g.date&&<span className="opacity-50">{g.date.slice(5)}</span>}
-          {mode==="parent"&&<span className="opacity-40 ml-0.5">✎</span>}
+          {isOwner&&<span className="opacity-40 ml-0.5">✎</span>}
         </div>
         {isE&&(
           <div className="absolute z-20 top-full mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-3 min-w-max">
@@ -408,27 +368,9 @@ export default function App() {
   };
   const SBadge = ({sid}) => { const s=subj(sid); return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>; };
 
-  const PinModal = () => (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-72 shadow-xl">
-        <h2 className="font-bold text-lg mb-1">Режим родителя</h2>
-        <p className="text-slate-400 text-sm mb-3">Введите PIN-код</p>
-        <input type="password" maxLength={4}
-          className={`border-2 rounded-xl px-4 py-3 text-center text-xl w-full tracking-widest focus:outline-none ${pinErr?"border-red-400":"border-slate-200 focus:border-blue-400"}`}
-          placeholder="••••" value={pin} onChange={e=>{setPin(e.target.value);setPinErr(false);}} onKeyDown={e=>e.key==="Enter"&&enterParent()} autoFocus/>
-        {pinErr&&<p className="text-red-500 text-xs text-center mt-2">Неверный PIN</p>}
-        <p className="text-slate-300 text-xs text-center mt-1">PIN: 1234</p>
-        <div className="flex gap-2 mt-4">
-          <Btn onClick={()=>{setShowPin(false);setPin("");setPinErr(false);}} cls="flex-1 bg-slate-100 text-slate-600">Отмена</Btn>
-          <Btn onClick={enterParent} cls="flex-1 bg-blue-500 text-white hover:bg-blue-600">Войти</Btn>
-        </div>
-      </div>
-    </div>
-  );
-
   const activeCh = children.find(c=>c.id===cid);
-  const TABS = mode==="parent"
-    ? ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Дети"]
+  const TABS = isOwner
+    ? ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]
     : ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки"];
 
   const activeLessons = lessonsFor(aDate);
@@ -442,7 +384,7 @@ export default function App() {
         {/* Шапка */}
         <div className="flex items-center gap-2 mb-4">
           <button onClick={goSelect} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
-          {mode==="parent"
+          {isOwner
             ? <div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
                 {children.map(ch=>(
                   <button key={ch.id} onClick={()=>{setCid(ch.id);setTab(0);}}
@@ -457,11 +399,8 @@ export default function App() {
               </div>
           }
           <span className="text-xs text-slate-300">{saving?"💾":"✅"}</span>
-          {mode==="child"&&isOwner&&<button onClick={()=>setShowPin(true)} className="bg-slate-100 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium">🔑</button>}
-          {mode==="parent"&&<button onClick={()=>setMode("child")} className="bg-amber-100 text-amber-700 rounded-xl px-3 py-1.5 text-xs font-medium">👨‍👩‍👧‍👦</button>}
+          {isOwner&&<span className="bg-amber-100 text-amber-700 rounded-xl px-2 py-1 text-xs font-medium">👨‍👩‍👧‍👦</span>}
         </div>
-
-        {showPin&&<PinModal/>}
 
         {/* Табы */}
         <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
@@ -516,13 +455,13 @@ export default function App() {
                         {isOnce&&<span className="text-purple-400 text-xs">📌</span>}
                         {lHw.some(h=>!h.done)&&<span className="text-orange-400 text-xs">📝</span>}
                         {lGr[0]&&<GBadge v={lGr[0].value}/>}
-                        {mode==="parent"&&<button onClick={()=>isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                        {isOwner&&<button onClick={()=>isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
                       </div>
                     );
                   })
               }
             </Card>
-            {mode==="parent"&&(
+            {isOwner&&(
               <Card>
                 <ST>Добавить урок</ST>
                 <div className="space-y-2">
@@ -577,11 +516,11 @@ export default function App() {
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <SBadge sid={h.subjectId}/>
                           {h.date&&<span className="text-xs text-slate-400">до {h.date}</span>}
-                          {h.grade&&(mode==="parent"?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}}/>:<GBadge v={h.grade}/>)}
+                          {h.grade&&(isOwner?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}}/>:<GBadge v={h.grade}/>)}
                         </div>
                         <p className={`text-sm text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
                         {h.comment&&<div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"><p className="text-xs text-amber-600 font-medium">💬 Родитель:</p><p className="text-xs text-amber-800 mt-0.5">{h.comment}</p></div>}
-                        {mode==="parent"&&(
+                        {isOwner&&(
                           <div className="mt-3 space-y-2">
                             <div className="flex items-center gap-2"><GPicker value={h.grade} onChange={g=>upd({homework:homework.map(x=>x.id===h.id?{...x,grade:g}:x)})}/><span className="text-xs text-slate-400">оценка</span></div>
                             <div className="flex gap-2 items-end">
@@ -592,13 +531,13 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      {mode==="parent"&&<button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                      {isOwner&&<button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
                     </div>
                   </Card>
                 ))
               }
             </div>
-            {mode==="parent"&&(
+            {isOwner&&(
               <Card>
                 <ST>Добавить задание</ST>
                 <div className="space-y-2">
@@ -632,7 +571,7 @@ export default function App() {
         {/* ══ ОЦЕНКИ ══ */}
         {tab===2&&(
           <div>
-            {mode==="parent"&&<p className="text-xs text-slate-400 mb-3 text-center">Нажмите на оценку для изменения</p>}
+            {isOwner&&<p className="text-xs text-slate-400 mb-3 text-center">Нажмите на оценку для изменения</p>}
             <div className="space-y-3 mb-4">
               {schSubjs.some(s=>sjGrades(s.id).length>0)
                 ? schSubjs.filter(s=>sjGrades(s.id).length>0).map(s=>{
@@ -650,7 +589,7 @@ export default function App() {
                 : <Empty txt="Оценок ещё нет"/>
               }
             </div>
-            {mode==="parent"&&(
+            {isOwner&&(
               <Card>
                 <ST>Добавить оценку</ST>
                 {schSubjs.length===0
@@ -691,7 +630,7 @@ export default function App() {
                         <p className={`text-sm font-medium text-slate-700 ${c.done?"line-through":""}`}>{c.name}</p>
                         <p className="text-xs text-slate-400">{DAYS_FULL[DAYS.indexOf(c.day)]}{c.time?`, ${c.time}`:""}</p>
                         {c.comment&&<div className="mt-1 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1"><p className="text-xs text-amber-800">💬 {c.comment}</p></div>}
-                        {mode==="parent"&&(
+                        {isOwner&&(
                           <div className="flex gap-2 mt-2 items-end">
                             <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none" placeholder="Комментарий..." rows={2}
                               value={editC["c_"+c.id]??c.comment} onChange={e=>setEditC(p=>({...p,["c_"+c.id]:e.target.value}))}/>
@@ -699,13 +638,13 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      {mode==="parent"&&<button onClick={()=>upd({clubs:clubs.filter(x=>x.id!==c.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                      {isOwner&&<button onClick={()=>upd({clubs:clubs.filter(x=>x.id!==c.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
                     </div>
                   </Card>
                 ))
               }
             </div>
-            {mode==="parent"&&(
+            {isOwner&&(
               <Card>
                 <ST>Добавить кружок</ST>
                 <div className="space-y-2">
@@ -724,7 +663,7 @@ export default function App() {
         )}
 
         {/* ══ ПРЕДМЕТЫ ══ */}
-        {tab===4&&mode==="parent"&&(
+        {tab===4&&isOwner&&(
           <div>
             <Card cls="mb-4">
               <ST>Предметы в расписании {activeCh?.name}</ST>
@@ -756,18 +695,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ══ ДЕТИ ══ */}
-        {tab===5&&mode==="parent"&&(
+        {/* ══ СЕМЬЯ ══ */}
+        {tab===5&&isOwner&&(
           <div>
-            <Card cls="mb-4 border border-red-100">
-              <ST>⚠️ Опасная зона</ST>
-              <p className="text-xs text-slate-400 mb-3">Удаление семьи сотрёт все данные: расписание, задания, оценки, профили детей. Отменить невозможно.</p>
-              <button onClick={deleteFamily}
-                className="w-full bg-red-50 text-red-500 border border-red-200 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-100 transition-all">
-                🗑 Удалить семью и все данные
-              </button>
-            </Card>
-
             {/* Код семьи */}
             <Card cls="mb-4 bg-amber-50 border border-amber-100">
               <ST>🔑 Код семьи</ST>
@@ -780,6 +710,7 @@ export default function App() {
               </div>
             </Card>
 
+            {/* Профили детей */}
             <div className="space-y-3 mb-4">
               {children.length===0?<Empty txt="Детей нет — добавьте первого"/>
                 : children.map(ch=>(
@@ -789,9 +720,7 @@ export default function App() {
                       <div className="flex-1">
                         <p className="font-semibold text-slate-700">{ch.name}</p>
                         <p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р.`}{ch.birthYear&&ch.grade?" · ":""}{ch.grade&&`${ch.grade} класс`}</p>
-                        <p className="text-xs text-slate-400">
-                          {weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий
-                        </p>
+                        <p className="text-xs text-slate-400">{weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий</p>
                       </div>
                       <button onClick={()=>remChild(ch.id)} className="text-slate-300 hover:text-red-400 text-lg">×</button>
                     </div>
@@ -799,7 +728,9 @@ export default function App() {
                 ))
               }
             </div>
-            <Card>
+
+            {/* Добавить ребёнка */}
+            <Card cls="mb-4">
               <ST>Добавить ребёнка</ST>
               <div className="space-y-2">
                 <Inp cls="w-full" placeholder="Имя (Артём, Соня...)" value={newChild.name} onChange={e=>setNewChild(p=>({...p,name:e.target.value}))}/>
@@ -818,6 +749,16 @@ export default function App() {
                 )}
                 <Btn onClick={addChild} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
               </div>
+            </Card>
+
+            {/* Опасная зона */}
+            <Card cls="border border-red-100">
+              <ST>⚠️ Опасная зона</ST>
+              <p className="text-xs text-slate-400 mb-3">Удаление семьи сотрёт все данные безвозвратно.</p>
+              <button onClick={deleteFamily}
+                className="w-full bg-red-50 text-red-500 border border-red-200 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-100 transition-all">
+                🗑 Удалить семью и все данные
+              </button>
             </Card>
           </div>
         )}
