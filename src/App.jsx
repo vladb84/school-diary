@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+  const TABS = isOwner
+    ? ["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки","import { useState, useEffect } from "react";
 import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
@@ -344,7 +345,7 @@ export default function App() {
                 <p className="text-xs text-amber-500 mt-1">Вводится один раз при первом входе</p>
               </div>
             )}
-            <button onClick={()=>{setSetupStep("app");setTab(5);}}
+            <button onClick={()=>{setSetupStep("app");setTab(6);}}
               className="w-full bg-amber-100 text-amber-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-amber-200">
               ⚙️ Управление семьёй
             </button>
@@ -429,8 +430,8 @@ export default function App() {
     return {subjects: newSubjects, subjectId: newSubj.id};
   };
   const TABS = isOwner
-    ? ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]
-    : ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки"];
+    ? ["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]
+    : ["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки"];
 
   const activeLessons = lessonsFor(aDate);
   const hwDateLessons = lessonsFor(hwF.due);
@@ -690,8 +691,136 @@ export default function App() {
           </div>
         )}
 
+        {/* ══ СТАТИСТИКА ══ */}
+        {tab===3&&(()=>{
+          // Оценки по предметам
+          const subjectStats = schSubjs.map(s=>{
+            const gs = sjGrades(s.id);
+            const vals = gs.map(g=>+g.value).filter(Boolean);
+            const average = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+            // Динамика: сравниваем последние 3 оценки с предыдущими 3
+            const recent = vals.slice(0,3), older = vals.slice(3,6);
+            const recentAvg = recent.length ? recent.reduce((a,b)=>a+b,0)/recent.length : null;
+            const olderAvg = older.length ? older.reduce((a,b)=>a+b,0)/older.length : null;
+            const trend = recentAvg&&olderAvg ? (recentAvg>olderAvg?"up":recentAvg<olderAvg?"down":"same") : "same";
+            return {s, average, count:vals.length, trend};
+          }).filter(x=>x.count>0).sort((a,b)=>(b.average||0)-(a.average||0));
+
+          // ДЗ за текущую неделю
+          const weekStart = ds(getMonday(new Date()));
+          const weekEnd = ds(wDates[5]);
+          const weekHw = chHw.filter(h=>h.date>=weekStart&&h.date<=weekEnd);
+          const weekDone = weekHw.filter(h=>h.done).length;
+          const weekTotal = weekHw.length;
+          const hwPct = weekTotal ? Math.round(weekDone/weekTotal*100) : null;
+
+          // Все ДЗ
+          const allDone = chHw.filter(h=>h.done).length;
+          const allTotal = chHw.length;
+
+          // Лучший и проблемный предмет
+          const best = subjectStats[0];
+          const worst = subjectStats[subjectStats.length-1];
+
+          // Последние 10 оценок для мини-графика
+          const allGrades = schSubjs.flatMap(s=>sjGrades(s.id).map(g=>({...g,subj:s}))).sort((a,b)=>a.date.localeCompare(b.date)).slice(-10);
+
+          return (
+            <div className="space-y-4">
+              {/* Заголовок */}
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-700">Статистика {activeCh?.name}</h2>
+                <span className="text-xs text-slate-400">{new Date().toLocaleDateString("ru")}</span>
+              </div>
+
+              {/* Лучший / проблемный */}
+              {subjectStats.length>1&&(
+                <div className="grid grid-cols-2 gap-3">
+                  <Card cls="border-l-4 border-green-400">
+                    <p className="text-xs text-slate-400 mb-1">🏆 Лучший предмет</p>
+                    <p className="text-sm font-semibold text-slate-700 leading-tight">{best?.s.name}</p>
+                    <p className={`text-2xl font-bold mt-1 ${GC[Math.round(best?.average||0)]?.split(" ")[1]||"text-slate-700"}`}>{best?.average?.toFixed(1)}</p>
+                  </Card>
+                  <Card cls="border-l-4 border-red-300">
+                    <p className="text-xs text-slate-400 mb-1">📉 Подтянуть</p>
+                    <p className="text-sm font-semibold text-slate-700 leading-tight">{worst?.s.name}</p>
+                    <p className={`text-2xl font-bold mt-1 ${GC[Math.round(worst?.average||0)]?.split(" ")[1]||"text-slate-700"}`}>{worst?.average?.toFixed(1)}</p>
+                  </Card>
+                </div>
+              )}
+
+              {/* ДЗ за неделю */}
+              <Card>
+                <p className="text-sm font-medium text-slate-600 mb-3">📝 Домашние задания</p>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="text-center">
+                    <p className="text-xs text-slate-400 mb-1">За эту неделю</p>
+                    {weekTotal>0
+                      ? <><p className="text-2xl font-bold text-slate-700">{hwPct}%</p><p className="text-xs text-slate-400">{weekDone} из {weekTotal}</p></>
+                      : <p className="text-sm text-slate-400">Нет заданий</p>
+                    }
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-slate-400 mb-1">Всего</p>
+                    <p className="text-2xl font-bold text-slate-700">{allTotal>0?Math.round(allDone/allTotal*100):0}%</p>
+                    <p className="text-xs text-slate-400">{allDone} из {allTotal}</p>
+                  </div>
+                </div>
+                {weekTotal>0&&(
+                  <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div className="bg-green-400 h-2 rounded-full transition-all" style={{width:`${hwPct}%`}}/>
+                  </div>
+                )}
+              </Card>
+
+              {/* Средний балл по предметам */}
+              {subjectStats.length>0&&(
+                <Card>
+                  <p className="text-sm font-medium text-slate-600 mb-3">⭐ Средний балл по предметам</p>
+                  <div className="space-y-2">
+                    {subjectStats.map(({s,average,count,trend})=>{
+                      const rounded = Math.round(average||0);
+                      const colorBar = rounded>=5?"bg-green-400":rounded>=4?"bg-blue-400":rounded>=3?"bg-yellow-400":"bg-red-400";
+                      return (
+                        <div key={s.id}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-slate-600 flex-1 truncate">{s.name}</span>
+                            <span className="text-xs text-slate-400">{count} оц.</span>
+                            <span className="text-xs">{trend==="up"?"📈":trend==="down"?"📉":"➡️"}</span>
+                            <span className={`text-sm font-bold w-8 text-right ${GC[rounded]?.split(" ")[1]||"text-slate-600"}`}>{average?.toFixed(1)}</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-1.5">
+                            <div className={`${colorBar} h-1.5 rounded-full transition-all`} style={{width:`${((average||0)/5)*100}%`}}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              {/* Последние оценки */}
+              {allGrades.length>0&&(
+                <Card>
+                  <p className="text-sm font-medium text-slate-600 mb-3">📅 Последние оценки</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {allGrades.map((g,i)=>(
+                      <div key={i} className="flex flex-col items-center gap-0.5">
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${GC[g.value]||"bg-slate-100 text-slate-600"}`}>{g.value}</span>
+                        <span className="text-xs text-slate-400 max-w-8 truncate text-center">{g.subj?.name?.split(" ")[0]}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {subjectStats.length===0&&<Empty txt="Оценок пока нет — статистика появится после первых отметок"/>}
+            </div>
+          );
+        })()}
+
         {/* ══ КРУЖКИ ══ */}
-        {tab===3&&(
+        {tab===4&&(
           <div>
             <div className="space-y-3 mb-4">
               {chCl.length===0?<Empty txt="Кружки не добавлены"/>
@@ -737,7 +866,7 @@ export default function App() {
         )}
 
         {/* ══ ПРЕДМЕТЫ ══ */}
-        {tab===4&&isOwner&&(
+        {tab===5&&isOwner&&(
           <div>
             <Card cls="mb-4">
               <ST>Предметы в расписании {activeCh?.name}</ST>
@@ -770,7 +899,7 @@ export default function App() {
         )}
 
         {/* ══ СЕМЬЯ ══ */}
-        {tab===5&&isOwner&&(
+        {tab===6&&isOwner&&(
           <div>
             {/* Код семьи */}
             <Card cls="mb-4 bg-amber-50 border border-amber-100">
