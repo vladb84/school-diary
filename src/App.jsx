@@ -824,103 +824,91 @@ export default function App() {
               
               {/* График динамики оценок */}
               {(() => {
-                const allGrades = schSubjs.flatMap(s =>
-                  sjGrades(s.id).filter(g => g.date).map(g => ({ ...g, sn: s.name, sid: s.id, color: SC[s.c % SC.length] }))
-                ).sort((a, b) => a.date.localeCompare(b.date));
-                if (allGrades.length < 2) return null;
-
                 const COLORS = ["#378ADD","#1D9E75","#EF9F27","#D4537E","#8B5CF6","#F97316","#06B6D4","#84CC16"];
                 const subjColors = {};
                 schSubjs.forEach((s, i) => { subjColors[s.id] = COLORS[i % COLORS.length]; });
 
-                const W = 600, H = 180, PL = 28, PR = 12, PT = 12, PB = 28;
+                const allGrades = schSubjs.flatMap(s =>
+                  sjGrades(s.id).filter(g => g.date && g.value).map(g => ({ ...g, sn: s.name, sid: s.id }))
+                ).sort((a, b) => a.date.localeCompare(b.date));
+
+                if (allGrades.length < 2) return null;
+
+                const filtSid = selectedSubj;
+                const visGrades = filtSid ? allGrades.filter(g => g.sid === filtSid) : allGrades;
+                if (visGrades.length < 1) return null;
+
+                const W = 560, H = 160, PL = 24, PR = 8, PT = 10, PB = 24;
                 const IW = W - PL - PR, IH = H - PT - PB;
 
-                const renderChart = (grades) => {
-                  if (grades.length < 2) return null;
-                  const dates = [...new Set(grades.map(g => g.date))].sort();
-                  const xStep = IW / Math.max(dates.length - 1, 1);
+                const dates = [...new Set(visGrades.map(g => g.date))].sort();
+                const xPos = d => PL + (dates.length < 2 ? IW / 2 : (dates.indexOf(d) / (dates.length - 1)) * IW);
+                const yPos = v => PT + IH - ((+v - 2) / 3) * IH;
 
-                  const bySid = {};
-                  grades.forEach(g => {
-                    if (!bySid[g.sid]) bySid[g.sid] = {};
-                    if (!bySid[g.sid][g.date]) bySid[g.sid][g.date] = [];
-                    bySid[g.sid][g.date].push(+g.value);
-                  });
+                const bySid = {};
+                visGrades.forEach(g => {
+                  if (!bySid[g.sid]) bySid[g.sid] = [];
+                  bySid[g.sid].push(g);
+                });
 
-                  const lines = Object.entries(bySid).map(([sid, byDate]) => {
-                    const pts = dates.map((d, i) => {
-                      const vals = byDate[d];
-                      if (!vals) return null;
-                      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-                      return { x: PL + i * xStep, y: PT + IH - ((avg - 2) / 3) * IH, v: avg.toFixed(1) };
-                    }).filter(Boolean);
-                    return { sid, pts, color: subjColors[sid] };
-                  });
-
-                  const yLabels = [2, 3, 4, 5];
-                  const xLabels = dates.filter((_, i) => dates.length <= 6 || i % Math.ceil(dates.length / 6) === 0);
-
-                  return (
-                    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
-                      {yLabels.map(v => {
-                        const y = PT + IH - ((v - 2) / 3) * IH;
-                        return (
-                          <g key={v}>
-                            <line x1={PL} x2={W - PR} y1={y} y2={y} stroke="rgba(0,0,0,0.06)" strokeWidth="1" />
-                            <text x={PL - 4} y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">{v}</text>
-                          </g>
-                        );
-                      })}
-                      {xLabels.map(d => {
-                        const i = dates.indexOf(d);
-                        const x = PL + i * xStep;
-                        return (
-                          <text key={d} x={x} y={H - 4} textAnchor="middle" fontSize="10" fill="#94a3b8">{d.slice(5)}</text>
-                        );
-                      })}
-                      {lines.map(({ sid, pts, color }) => (
-                        <g key={sid}>
-                          {pts.length > 1 && (
-                            <polyline
-                              points={pts.map(p => `${p.x},${p.y}`).join(" ")}
-                              fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                            />
-                          )}
-                          {pts.map((p, i) => (
-                            <g key={i}>
-                              <circle cx={p.x} cy={p.y} r="4" fill={color} />
-                              <circle cx={p.x} cy={p.y} r="2.5" fill="#fff" />
-                            </g>
-                          ))}
-                        </g>
-                      ))}
-                    </svg>
-                  );
-                };
+                const xLabels = dates.length <= 7 ? dates : dates.filter((_, i) => i % Math.ceil(dates.length / 7) === 0 || i === dates.length - 1);
 
                 return (
                   <div style={{ background: "#fff", border: "0.5px solid #e2e8f0", borderRadius: "14px", padding: "14px", marginBottom: "14px" }}>
                     <p style={{ fontSize: "13px", fontWeight: "500", margin: "0 0 10px" }}>Динамика оценок</p>
+
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
-                      <button
-                        onClick={() => setSelectedSubj(null)}
-                        style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "99px", border: "0.5px solid #cbd5e1", background: !selectedSubj ? "#1e293b" : "transparent", color: !selectedSubj ? "#fff" : "#64748b", cursor: "pointer" }}>
+                      <button onClick={() => setSelectedSubj(null)}
+                        style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "99px", border: "0.5px solid #cbd5e1", background: !filtSid ? "#1e293b" : "transparent", color: !filtSid ? "#fff" : "#64748b", cursor: "pointer" }}>
                         Все
                       </button>
                       {schSubjs.map(s => (
-                        <button key={s.id}
-                          onClick={() => setSelectedSubj(selectedSubj === s.id ? null : s.id)}
-                          style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "99px", border: "0.5px solid #cbd5e1", background: selectedSubj === s.id ? subjColors[s.id] : "transparent", color: selectedSubj === s.id ? "#fff" : "#64748b", cursor: "pointer" }}>
+                        <button key={s.id} onClick={() => setSelectedSubj(filtSid === s.id ? null : s.id)}
+                          style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "99px", border: "0.5px solid #cbd5e1", background: filtSid === s.id ? subjColors[s.id] : "transparent", color: filtSid === s.id ? "#fff" : "#64748b", cursor: "pointer" }}>
                           {s.name.split(" ")[0]}
                         </button>
                       ))}
                     </div>
-                    {renderChart(selectedSubj ? allGrades.filter(g => g.sid === selectedSubj) : allGrades)}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" }}>
-                      {schSubjs.filter(s => !selectedSubj || s.id === selectedSubj).map(s => (
+
+                    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+                      {[2,3,4,5].map(v => (
+                        <g key={v}>
+                          <line x1={PL} x2={W-PR} y1={yPos(v)} y2={yPos(v)} stroke="#f1f5f9" strokeWidth="1"/>
+                          <text x={PL-4} y={yPos(v)+4} textAnchor="end" fontSize="10" fill="#94a3b8">{v}</text>
+                        </g>
+                      ))}
+
+                      {xLabels.map(d => (
+                        <text key={d} x={xPos(d)} y={H-6} textAnchor="middle" fontSize="10" fill="#94a3b8">{d.slice(5)}</text>
+                      ))}
+
+                      {Object.entries(bySid).map(([sid, gs]) => {
+                        const color = subjColors[sid];
+                        const pts = gs.map(g => ({ x: xPos(g.date), y: yPos(g.value) }));
+                        return (
+                          <g key={sid}>
+                            {pts.length >= 2 && (
+                              <polyline
+                                points={pts.map(p => `${p.x},${p.y}`).join(" ")}
+                                fill="none" stroke={color} strokeWidth="2.5"
+                                strokeLinecap="round" strokeLinejoin="round"
+                              />
+                            )}
+                            {pts.map((p, i) => (
+                              <g key={i}>
+                                <circle cx={p.x} cy={p.y} r="5" fill={color}/>
+                                <circle cx={p.x} cy={p.y} r="2.5" fill="#fff"/>
+                              </g>
+                            ))}
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "8px" }}>
+                      {schSubjs.filter(s => !filtSid || s.id === filtSid).map(s => (
                         <span key={s.id} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#64748b" }}>
-                          <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: subjColors[s.id], display: "inline-block" }} />
+                          <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: subjColors[s.id], display: "inline-block" }}/>
                           {s.name.split(" ")[0]}
                         </span>
                       ))}
