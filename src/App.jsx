@@ -51,7 +51,7 @@ const INIT_SUBJS = [
 const INIT_DB = { children:[], subjects:INIT_SUBJS, weeklyTemplate:[], dateSchedule:[], homework:[], grades:[], clubs:[] };
 
 // ── Компоненты ───────────────────────────────────────────────
-const Card = ({cls="",children}) => <div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`}>{children}</div>;
+const Card = ({cls="",onClick,children}) => <div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`} onClick={onClick}>{children}</div>;
 const Empty = ({txt}) => <Card cls="py-10 text-center text-slate-400 text-sm">{txt}</Card>;
 const ST = ({children}) => <p className="text-sm font-medium text-slate-600 mb-3">{children}</p>;
 const Btn = ({cls="",...p}) => <button className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${cls}`} {...p}/>;
@@ -95,6 +95,7 @@ export default function App() {
   const [clF, setClF] = useState({name:"",day:"Пн",time:""});
   const [sjF, setSjF] = useState("");
   const [editC, setEditC] = useState({});
+  const [selectedSubj, setSelectedSubj] = useState(null);
 
   // Auth
   useEffect(() => {
@@ -659,7 +660,7 @@ export default function App() {
                 ? schSubjs.filter(s=>sjGrades(s.id).length>0).map(s => {
                     const gs=sjGrades(s.id), av=avgGrade(s.id);
                     return (
-                      <Card key={s.id}>
+                      <Card key={s.id} cls="cursor-pointer hover:shadow-md transition-all" onClick={()=>{ setSelectedSubj(s.id); setTab(3); }}>
                         <div className="flex items-center gap-2 mb-3">
                           <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
                           {av && <span className={`px-2 py-1 rounded-lg text-sm font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср: {av}</span>}
@@ -704,6 +705,72 @@ export default function App() {
 
         {/* ── TAB 3: СТАТИСТИКА ── */}
         {tab===3 && (() => {
+          // Если выбран конкретный предмет — показываем только его
+          if (selectedSubj) {
+            const s = subj(selectedSubj);
+            if (!s) return null;
+            const gs = sjGrades(selectedSubj);
+            const av = avgGrade(selectedSubj);
+            const hw = chHw.filter(h => h.subjectId === selectedSubj);
+            const bc = a => { const n = Math.round(a||0); if(n>=5) return "#1D9E75"; if(n>=4) return "#378ADD"; if(n>=3) return "#EF9F27"; return "#E24B4A"; };
+            const wDone = hw.filter(h=>h.done).length;
+            return (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <button onClick={()=>setSelectedSubj(null)} className="text-slate-400 hover:text-slate-600 text-sm flex items-center gap-1">← Все предметы</button>
+                </div>
+                {/* Карточка предмета */}
+                <div style={{background: av ? bc(parseFloat(av)) : "#64748b", borderRadius:"18px", padding:"20px", marginBottom:"14px"}}>
+                  <p style={{fontSize:"13px", color:"rgba(255,255,255,0.75)", margin:"0 0 4px"}}>{s.name}</p>
+                  <p style={{fontSize:"42px", fontWeight:"500", color:"#fff", margin:"0", lineHeight:"1"}}>{av || "—"}</p>
+                  <p style={{fontSize:"12px", color:"rgba(255,255,255,0.65)", margin:"6px 0 0"}}>средний балл</p>
+                  <div style={{display:"flex", gap:"20px", marginTop:"16px", paddingTop:"14px", borderTop:"1px solid rgba(255,255,255,0.2)"}}>
+                    <div><div style={{fontSize:"18px", fontWeight:"500", color:"#fff"}}>{gs.length}</div><div style={{fontSize:"11px", color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
+                    <div><div style={{fontSize:"18px", fontWeight:"500", color:"#fff"}}>{hw.length}</div><div style={{fontSize:"11px", color:"rgba(255,255,255,0.55)"}}>заданий</div></div>
+                    <div><div style={{fontSize:"18px", fontWeight:"500", color:"#fff"}}>{hw.length > 0 ? Math.round(wDone/hw.length*100)+"%" : "—"}</div><div style={{fontSize:"11px", color:"rgba(255,255,255,0.55)"}}>выполнено</div></div>
+                  </div>
+                </div>
+                {/* Оценки */}
+                {gs.length > 0 ? (
+                  <div style={{background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:"14px", padding:"14px", marginBottom:"14px"}}>
+                    <p style={{fontSize:"13px", fontWeight:"500", margin:"0 0 12px"}}>Оценки</p>
+                    <div className="flex flex-wrap gap-2">
+                      {gs.map((g,i) => (
+                        <div key={i} className={["flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-xs", GC[g.value]||"bg-slate-100"].join(" ")}>
+                          <span className="font-bold text-base">{g.value}</span>
+                          <span className="opacity-60">{g.type==="hw"?"дз":g.type==="test"?"к/р":"уст"}</span>
+                          {g.date && <span className="opacity-50">{g.date.slice(5)}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:"14px", padding:"14px", marginBottom:"14px"}}>
+                    <p className="text-sm text-slate-400 text-center py-2">Оценок пока нет</p>
+                  </div>
+                )}
+                {/* Домашние задания */}
+                {hw.length > 0 && (
+                  <div style={{background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:"14px", padding:"14px"}}>
+                    <p style={{fontSize:"13px", fontWeight:"500", margin:"0 0 12px"}}>Домашние задания</p>
+                    <div className="space-y-2">
+                      {hw.map(h => (
+                        <div key={h.id} className={["flex items-start gap-2 p-2.5 rounded-xl bg-slate-50", h.done?"opacity-60":""].join(" ")}>
+                          <span className={["mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs", h.done?"bg-green-500 border-green-500 text-white":"border-slate-300"].join(" ")}>{h.done&&"✓"}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={["text-xs text-slate-700", h.done?"line-through":""].join(" ")}>{h.task}</p>
+                            {h.date && <p className="text-xs text-slate-400 mt-0.5">до {h.date}</p>}
+                          </div>
+                          {h.grade && <span className={[GC[h.grade]||"","px-1.5 py-0.5 rounded-lg text-xs font-bold"].join(" ")}>{h.grade}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const ss = schSubjs.map(s => {
             const gs=sjGrades(s.id), v=gs.map(g=>+g.value).filter(Boolean);
             const a=v.length?(v.reduce((x,y)=>x+y,0)/v.length):null;
@@ -866,7 +933,7 @@ export default function App() {
                     {schSubjs.map(s => {
                       const av=avgGrade(s.id);
                       return (
-                        <div key={s.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50">
+                        <div key={s.id} onClick={()=>{ setSelectedSubj(s.id); setTab(3); }} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50 cursor-pointer active:bg-slate-100">
                           <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
                           <span className="text-xs text-slate-400">{chTpl.filter(l=>l.subjectId===s.id).length} ур/нед</span>
                           <span className="text-xs text-slate-400">{chHw.filter(h=>h.subjectId===s.id).length} дз</span>
@@ -957,6 +1024,7 @@ export default function App() {
         )}
 
       </div>
+
     </div>
   );
 }
