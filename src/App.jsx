@@ -880,7 +880,7 @@ export default function App() {
         )}
 
         {/* ══ ПРЕДМЕТЫ ══ */}
-        {tab===5&&isOwner&&(
+        {tab===6&&isOwner&&(
           <div>
             <Card cls="mb-4">
               <ST>Предметы в расписании {activeCh?.name}</ST>
