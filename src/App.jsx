@@ -19,6 +19,26 @@ const ds = d => d.toISOString().slice(0,10);
 const sd = s => new Date(s+"T00:00:00");
 const genCode = () => Math.random().toString(36).slice(2,8).toUpperCase();
 
+// Справочник предметов по классам
+const SUBJECTS_BY_GRADE = {
+  1:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
+  2:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
+  3:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык","Музыка","ИЗО","Физкультура","Технология"],
+  4:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык","Музыка","ИЗО","Физкультура","Технология"],
+  5:  ["Русский язык","Литература","Математика","История","Природоведение","Английский язык","Музыка","ИЗО","Физкультура","Технология","ОБЖ"],
+  6:  ["Русский язык","Литература","Математика","История","География","Биология","Английский язык","Музыка","ИЗО","Физкультура","Технология","ОБЖ"],
+  7:  ["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Английский язык","Физкультура","Технология","ОБЖ","Информатика"],
+  8:  ["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","Технология","ОБЖ","Информатика"],
+  9:  ["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика"],
+  10: ["Русский язык","Литература","Алгебра и начала анализа","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика","Астрономия"],
+  11: ["Русский язык","Литература","Алгебра и начала анализа","Геометрия","История","Обществознание","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика","Астрономия"],
+};
+
+function getSubjectsForGrade(grade) {
+  if(!grade) return null;
+  return SUBJECTS_BY_GRADE[Math.min(Math.max(grade,1),11)] || null;
+}
+
 const SUBJS = [
   {id:"s1",name:"Русский язык",c:0},{id:"s2",name:"Литература",c:1},{id:"s3",name:"Алгебра",c:2},
   {id:"s4",name:"Геометрия",c:3},{id:"s5",name:"История",c:4},{id:"s6",name:"Обществознание",c:5},
@@ -374,6 +394,24 @@ export default function App() {
   const SBadge = ({sid}) => { const s=subj(sid); return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>; };
 
   const activeCh = children.find(c=>c.id===cid);
+  const gradeSubjects = getSubjectsForGrade(activeCh?.grade);
+
+  // Список предметов для добавления урока:
+  // если есть справочник по классу — показываем его + предметы которые уже есть в расписании
+  // если класс не указан — показываем все предметы из базы
+  const scheduleSubjNames = [...new Set(chTpl.map(l=>subj(l.subjectId)?.name).filter(Boolean))];
+  const availableSubjectNames = gradeSubjects
+    ? [...new Set([...gradeSubjects, ...scheduleSubjNames])]
+    : subjects.map(s=>s.name);
+
+  // Получаем или создаём предмет по имени
+  const getOrCreateSubject = (name) => {
+    const existing = subjects.find(s=>s.name===name);
+    if(existing) return {subjects, subjectId: existing.id};
+    const newSubj = {id:uid(), name, c:subjects.length%SC.length};
+    const newSubjects = [...subjects, newSubj];
+    return {subjects: newSubjects, subjectId: newSubj.id};
+  };
   const TABS = isOwner
     ? ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]
     : ["📅 Расписание","📝 Задания","⭐ Оценки","🏆 Кружки"];
@@ -470,9 +508,16 @@ export default function App() {
               <Card>
                 <ST>Добавить урок</ST>
                 <div className="space-y-2">
+                  {gradeSubjects&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5 mb-1">🎓 Предметы для {activeCh?.grade} класса</p>}
                   <Sel cls="w-full" value={lF.subjectId} onChange={e=>setLF(p=>({...p,subjectId:e.target.value}))}>
                     <option value="">Выберите предмет...</option>
-                    {subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                    {gradeSubjects
+                      ? availableSubjectNames.map(name=>{
+                          const s=subjects.find(x=>x.name===name);
+                          return <option key={name} value={s?.id||"__new__"+name}>{name}</option>;
+                        })
+                      : subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)
+                    }
                   </Sel>
                   <div className="flex gap-2 items-end">
                     <div className="flex flex-col gap-1">
@@ -493,8 +538,16 @@ export default function App() {
                     </label>
                     <Btn onClick={()=>{
                       if(!lF.subjectId) return;
-                      if(lF.repeat) upd({weeklyTemplate:[...weeklyTemplate,{id:uid(),childId:cid,subjectId:lF.subjectId,day:activeDay,lessonNum:+lF.lessonNum,time:lF.time}]});
-                      else upd({dateSchedule:[...(dateSchedule||[]),{id:uid(),childId:cid,date:aDate,subjectId:lF.subjectId,lessonNum:+lF.lessonNum,time:lF.time}]});
+                      let subjId = lF.subjectId;
+                      let newSubjects = subjects;
+                      if(lF.subjectId.startsWith("__new__")) {
+                        const name = lF.subjectId.replace("__new__","");
+                        const r = getOrCreateSubject(name);
+                        newSubjects = r.subjects;
+                        subjId = r.subjectId;
+                      }
+                      if(lF.repeat) upd({subjects:newSubjects, weeklyTemplate:[...weeklyTemplate,{id:uid(),childId:cid,subjectId:subjId,day:activeDay,lessonNum:+lF.lessonNum,time:lF.time}]});
+                      else upd({subjects:newSubjects, dateSchedule:[...(dateSchedule||[]),{id:uid(),childId:cid,date:aDate,subjectId:subjId,lessonNum:+lF.lessonNum,time:lF.time}]});
                       setLF({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
                     }} cls="bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
                   </div>
