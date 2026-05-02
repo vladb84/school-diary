@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
@@ -72,7 +72,12 @@ export default function App() {
   const [editC, setEditC] = useState({});
   const [showCode, setShowCode] = useState(false);
 
+  // Определяем мобильный браузер
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   useEffect(()=>{
+    // Обработка редиректа после входа на мобильных
+    getRedirectResult(auth).catch(console.error);
     const unsub = onAuthStateChanged(auth, async u => {
       setUser(u);
       if(!u){ setSetupStep("login"); setDbData(null); setUserRec(null); return; }
@@ -191,7 +196,7 @@ export default function App() {
         <div className="text-6xl mb-4">📚</div>
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Школьный дневник</h1>
         <p className="text-slate-400 text-sm mb-8">Планировщик для всей семьи</p>
-        <button onClick={()=>signInWithPopup(auth,provider).catch(console.error)}
+        <button         onClick={()=>(isMobile ? signInWithRedirect(auth,provider) : signInWithPopup(auth,provider)).catch(console.error)}
           className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-3 text-sm font-medium hover:bg-slate-50 transition-all shadow-sm">
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
