@@ -197,7 +197,23 @@ export default function App() {
     if(!newChild.name.trim()) return;
     const by=parseInt(newChild.birthYear)||null, sy=parseInt(newChild.schoolYear)||null;
     const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
-    upd({children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
+    const childId = uid();
+
+    // Автоматически добавляем предметы по классу если они ещё не в базе
+    let newSubjects = [...subjects];
+    if(grade) {
+      const gradeList = getSubjectsForGrade(grade) || [];
+      gradeList.forEach(name => {
+        if(!newSubjects.find(s=>s.name===name)) {
+          newSubjects.push({id:uid(), name, c:newSubjects.length%SC.length});
+        }
+      });
+    }
+
+    upd({
+      subjects: newSubjects,
+      children:[...children,{id:childId,name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]
+    });
     setNewChild({name:"",birthYear:"",schoolYear:""});
   };
 
