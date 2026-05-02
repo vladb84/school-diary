@@ -449,7 +449,7 @@ export default function App() {
           {isOwner
             ? <div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
                 {children.map(ch => (
-                  <button key={ch.id} onClick={()=>{setCid(ch.id);setTab(0);}}
+                  <button key={ch.id} onClick={()=>setCid(ch.id)}
                     className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${cid===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
                     <span className="font-bold">{ch.name[0]}</span><span>{ch.name}</span>
                   </button>
