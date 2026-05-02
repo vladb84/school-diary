@@ -693,128 +693,142 @@ export default function App() {
 
         {/* ══ СТАТИСТИКА ══ */}
         {tab===3&&(()=>{
-          // Оценки по предметам
           const subjectStats = schSubjs.map(s=>{
-            const gs = sjGrades(s.id);
-            const vals = gs.map(g=>+g.value).filter(Boolean);
-            const average = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
-            // Динамика: сравниваем последние 3 оценки с предыдущими 3
-            const recent = vals.slice(0,3), older = vals.slice(3,6);
-            const recentAvg = recent.length ? recent.reduce((a,b)=>a+b,0)/recent.length : null;
-            const olderAvg = older.length ? older.reduce((a,b)=>a+b,0)/older.length : null;
-            const trend = recentAvg&&olderAvg ? (recentAvg>olderAvg?"up":recentAvg<olderAvg?"down":"same") : "same";
-            return {s, average, count:vals.length, trend};
+            const gs=sjGrades(s.id);
+            const vals=gs.map(g=>+g.value).filter(Boolean);
+            const average=vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+            const recent=vals.slice(0,3),older=vals.slice(3,6);
+            const rA=recent.length?recent.reduce((a,b)=>a+b,0)/recent.length:null;
+            const oA=older.length?older.reduce((a,b)=>a+b,0)/older.length:null;
+            const trend=rA&&oA?(rA>oA?"↑":rA<oA?"↓":"→"):"→";
+            return {s,average,count:vals.length,trend};
           }).filter(x=>x.count>0).sort((a,b)=>(b.average||0)-(a.average||0));
 
-          // ДЗ за текущую неделю
-          const weekStart = ds(getMonday(new Date()));
-          const weekEnd = ds(wDates[5]);
-          const weekHw = chHw.filter(h=>h.date>=weekStart&&h.date<=weekEnd);
-          const weekDone = weekHw.filter(h=>h.done).length;
-          const weekTotal = weekHw.length;
-          const hwPct = weekTotal ? Math.round(weekDone/weekTotal*100) : null;
+          const weekStart=ds(getMonday(new Date()));
+          const weekEnd=ds(wDates[5]);
+          const weekHw=chHw.filter(h=>h.date>=weekStart&&h.date<=weekEnd);
+          const weekDone=weekHw.filter(h=>h.done).length;
+          const weekTotal=weekHw.length;
+          const hwPct=weekTotal?Math.round(weekDone/weekTotal*100):0;
+          const allDone=chHw.filter(h=>h.done).length;
+          const allTotal=chHw.length;
+          const allPct=allTotal?Math.round(allDone/allTotal*100):0;
 
-          // Все ДЗ
-          const allDone = chHw.filter(h=>h.done).length;
-          const allTotal = chHw.length;
+          const best=subjectStats[0];
+          const worst=subjectStats[subjectStats.length-1];
 
-          // Лучший и проблемный предмет
-          const best = subjectStats[0];
-          const worst = subjectStats[subjectStats.length-1];
+          const overallAvg=subjectStats.length
+            ?(subjectStats.reduce((a,x)=>a+(x.average||0),0)/subjectStats.length).toFixed(1)
+            :null;
 
-          // Последние 10 оценок для мини-графика
-          const allGrades = schSubjs.flatMap(s=>sjGrades(s.id).map(g=>({...g,subj:s}))).sort((a,b)=>a.date.localeCompare(b.date)).slice(-10);
+          const totalGrades=subjectStats.reduce((a,x)=>a+x.count,0);
+
+          const lastGrades=schSubjs
+            .flatMap(s=>sjGrades(s.id).map(g=>({...g,sname:s.name})))
+            .sort((a,b)=>b.date.localeCompare(a.date))
+            .slice(0,10);
+
+          const gradeColor=v=>{
+            const n=+v;
+            if(n>=5) return {bg:"#EAF3DE",tc:"#3B6D11"};
+            if(n>=4) return {bg:"#E6F1FB",tc:"#185FA5"};
+            if(n>=3) return {bg:"#FAEEDA",tc:"#854F0B"};
+            return {bg:"#FCEBEB",tc:"#A32D2D"};
+          };
+          const barColor=avg=>{
+            const n=Math.round(avg||0);
+            if(n>=5) return "#1D9E75";
+            if(n>=4) return "#378ADD";
+            if(n>=3) return "#EF9F27";
+            return "#E24B4A";
+          };
+
+          if(subjectStats.length===0) return <Empty txt="Оценок пока нет — статистика появится после первых отметок"/>;
 
           return (
-            <div className="space-y-4">
-              {/* Заголовок */}
-              <div className="flex items-center justify-between">
-                <h2 className="font-bold text-slate-700">Статистика {activeCh?.name}</h2>
-                <span className="text-xs text-slate-400">{new Date().toLocaleDateString("ru")}</span>
+            <div>
+              {/* Герой */}
+              <div style={{background:"#185FA5",borderRadius:"18px",padding:"20px",marginBottom:"14px"}}>
+                <p style={{fontSize:"11px",color:"rgba(255,255,255,0.6)",margin:"0 0 4px",letterSpacing:"0.5px"}}>СРЕДНИЙ БАЛЛ</p>
+                <p style={{fontSize:"42px",fontWeight:"500",color:"#fff",margin:"0",lineHeight:"1"}}>{overallAvg||"—"}</p>
+                <p style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",margin:"6px 0 0"}}>по всем предметам</p>
+                <div style={{display:"flex",gap:"20px",marginTop:"18px",paddingTop:"16px",borderTop:"1px solid rgba(255,255,255,0.15)"}}>
+                  <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{totalGrades}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
+                  <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{allPct}%</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>ДЗ выполнено</div></div>
+                  <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{subjectStats.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>предметов</div></div>
+                </div>
               </div>
 
-              {/* Лучший / проблемный */}
+              {/* Лучший / подтянуть */}
               {subjectStats.length>1&&(
-                <div className="grid grid-cols-2 gap-3">
-                  <Card cls="border-l-4 border-green-400">
-                    <p className="text-xs text-slate-400 mb-1">🏆 Лучший предмет</p>
-                    <p className="text-sm font-semibold text-slate-700 leading-tight">{best?.s.name}</p>
-                    <p className={`text-2xl font-bold mt-1 ${GC[Math.round(best?.average||0)]?.split(" ")[1]||"text-slate-700"}`}>{best?.average?.toFixed(1)}</p>
-                  </Card>
-                  <Card cls="border-l-4 border-red-300">
-                    <p className="text-xs text-slate-400 mb-1">📉 Подтянуть</p>
-                    <p className="text-sm font-semibold text-slate-700 leading-tight">{worst?.s.name}</p>
-                    <p className={`text-2xl font-bold mt-1 ${GC[Math.round(worst?.average||0)]?.split(" ")[1]||"text-slate-700"}`}>{worst?.average?.toFixed(1)}</p>
-                  </Card>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"14px"}}>
+                  <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderLeft:"3px solid #1D9E75",borderRadius:"14px",padding:"14px"}}>
+                    <p style={{fontSize:"11px",color:"var(--color-text-tertiary)",margin:"0 0 5px"}}>Лучший предмет</p>
+                    <p style={{fontSize:"13px",fontWeight:"500",color:"var(--color-text-primary)",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{best.s.name}</p>
+                    <p style={{fontSize:"26px",fontWeight:"500",color:"#1D9E75",margin:"0"}}>{best.average?.toFixed(1)}</p>
+                  </div>
+                  <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderLeft:"3px solid #E24B4A",borderRadius:"14px",padding:"14px"}}>
+                    <p style={{fontSize:"11px",color:"var(--color-text-tertiary)",margin:"0 0 5px"}}>Подтянуть</p>
+                    <p style={{fontSize:"13px",fontWeight:"500",color:"var(--color-text-primary)",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{worst.s.name}</p>
+                    <p style={{fontSize:"26px",fontWeight:"500",color:"#E24B4A",margin:"0"}}>{worst.average?.toFixed(1)}</p>
+                  </div>
                 </div>
               )}
 
-              {/* ДЗ за неделю */}
-              <Card>
-                <p className="text-sm font-medium text-slate-600 mb-3">📝 Домашние задания</p>
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div className="text-center">
-                    <p className="text-xs text-slate-400 mb-1">За эту неделю</p>
-                    {weekTotal>0
-                      ? <><p className="text-2xl font-bold text-slate-700">{hwPct}%</p><p className="text-xs text-slate-400">{weekDone} из {weekTotal}</p></>
-                      : <p className="text-sm text-slate-400">Нет заданий</p>
-                    }
+              {/* Предметы */}
+              <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}>
+                <p style={{fontSize:"13px",fontWeight:"500",color:"var(--color-text-primary)",margin:"0 0 12px"}}>Успеваемость по предметам</p>
+                {subjectStats.map(({s,average,count,trend})=>(
+                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px"}}>
+                    <span style={{fontSize:"12px",color:"var(--color-text-secondary)",flex:"1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
+                    <span style={{fontSize:"12px",color:barColor(average),width:"14px",textAlign:"center"}}>{trend}</span>
+                    <div style={{flex:"1",maxWidth:"90px",background:"var(--color-background-secondary)",borderRadius:"99px",height:"5px"}}>
+                      <div style={{height:"5px",borderRadius:"99px",background:barColor(average),width:`${((average||0)/5)*100}%`}}/>
+                    </div>
+                    <span style={{fontSize:"13px",fontWeight:"500",minWidth:"30px",textAlign:"right",color:barColor(average)}}>{average?.toFixed(1)}</span>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs text-slate-400 mb-1">Всего</p>
-                    <p className="text-2xl font-bold text-slate-700">{allTotal>0?Math.round(allDone/allTotal*100):0}%</p>
-                    <p className="text-xs text-slate-400">{allDone} из {allTotal}</p>
+                ))}
+              </div>
+
+              {/* ДЗ */}
+              <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}>
+                <p style={{fontSize:"13px",fontWeight:"500",color:"var(--color-text-primary)",margin:"0 0 12px"}}>Домашние задания</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"14px"}}>
+                  <div style={{background:"var(--color-background-secondary)",borderRadius:"10px",padding:"10px",textAlign:"center"}}>
+                    <div style={{fontSize:"22px",fontWeight:"500",color:"var(--color-text-primary)"}}>{weekTotal>0?`${hwPct}%`:"—"}</div>
+                    <div style={{fontSize:"11px",color:"var(--color-text-tertiary)"}}>эта неделя</div>
+                    {weekTotal>0&&<div style={{fontSize:"11px",color:"var(--color-text-tertiary)"}}>{weekDone} из {weekTotal}</div>}
+                  </div>
+                  <div style={{background:"var(--color-background-secondary)",borderRadius:"10px",padding:"10px",textAlign:"center"}}>
+                    <div style={{fontSize:"22px",fontWeight:"500",color:"var(--color-text-primary)"}}>{allTotal>0?`${allPct}%`:"—"}</div>
+                    <div style={{fontSize:"11px",color:"var(--color-text-tertiary)"}}>всего</div>
+                    {allTotal>0&&<div style={{fontSize:"11px",color:"var(--color-text-tertiary)"}}>{allDone} из {allTotal}</div>}
                   </div>
                 </div>
                 {weekTotal>0&&(
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div className="bg-green-400 h-2 rounded-full transition-all" style={{width:`${hwPct}%`}}/>
+                  <div style={{background:"var(--color-background-secondary)",borderRadius:"99px",height:"7px"}}>
+                    <div style={{height:"7px",borderRadius:"99px",background:"#1D9E75",width:`${hwPct}%`}}/>
                   </div>
                 )}
-              </Card>
+              </div>
 
-              {/* Средний балл по предметам */}
-              {subjectStats.length>0&&(
-                <Card>
-                  <p className="text-sm font-medium text-slate-600 mb-3">⭐ Средний балл по предметам</p>
-                  <div className="space-y-2">
-                    {subjectStats.map(({s,average,count,trend})=>{
-                      const rounded = Math.round(average||0);
-                      const colorBar = rounded>=5?"bg-green-400":rounded>=4?"bg-blue-400":rounded>=3?"bg-yellow-400":"bg-red-400";
+              {/* Последние оценки */}
+              {lastGrades.length>0&&(
+                <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"14px",padding:"14px"}}>
+                  <p style={{fontSize:"13px",fontWeight:"500",color:"var(--color-text-primary)",margin:"0 0 12px"}}>Последние оценки</p>
+                  <div style={{display:"flex",gap:"7px",flexWrap:"wrap"}}>
+                    {lastGrades.map((g,i)=>{
+                      const {bg,tc}=gradeColor(g.value);
                       return (
-                        <div key={s.id}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-slate-600 flex-1 truncate">{s.name}</span>
-                            <span className="text-xs text-slate-400">{count} оц.</span>
-                            <span className="text-xs">{trend==="up"?"📈":trend==="down"?"📉":"➡️"}</span>
-                            <span className={`text-sm font-bold w-8 text-right ${GC[rounded]?.split(" ")[1]||"text-slate-600"}`}>{average?.toFixed(1)}</span>
-                          </div>
-                          <div className="w-full bg-slate-100 rounded-full h-1.5">
-                            <div className={`${colorBar} h-1.5 rounded-full transition-all`} style={{width:`${((average||0)/5)*100}%`}}/>
-                          </div>
+                        <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
+                          <div style={{width:"34px",height:"34px",borderRadius:"9px",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"15px",fontWeight:"500",color:tc}}>{g.value}</div>
+                          <div style={{fontSize:"10px",color:"var(--color-text-tertiary)"}}>{g.sname?.split(" ")[0]?.slice(0,4)}</div>
                         </div>
                       );
                     })}
                   </div>
-                </Card>
+                </div>
               )}
-
-              {/* Последние оценки */}
-              {allGrades.length>0&&(
-                <Card>
-                  <p className="text-sm font-medium text-slate-600 mb-3">📅 Последние оценки</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {allGrades.map((g,i)=>(
-                      <div key={i} className="flex flex-col items-center gap-0.5">
-                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${GC[g.value]||"bg-slate-100 text-slate-600"}`}>{g.value}</span>
-                        <span className="text-xs text-slate-400 max-w-8 truncate text-center">{g.subj?.name?.split(" ")[0]}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {subjectStats.length===0&&<Empty txt="Оценок пока нет — статистика появится после первых отметок"/>}
             </div>
           );
         })()}
