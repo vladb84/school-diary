@@ -3,44 +3,50 @@ import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuth
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
-// ── Константы ────────────────────────────────────────────────
-const DAYS = ["Пн","Вт","Ср","Чт","Пт","Сб"];
+// ── Константы ───────────────────────────────────────────────────────────────
+const DAYS      = ["Пн","Вт","Ср","Чт","Пт","Сб"];
 const DAYS_FULL = ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
-const MON = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
-const GC = {"5":"bg-green-100 text-green-700","4":"bg-blue-100 text-blue-700","3":"bg-yellow-100 text-yellow-700","2":"bg-red-100 text-red-700"};
-const SC = ["bg-blue-100 text-blue-800","bg-purple-100 text-purple-800","bg-emerald-100 text-emerald-800","bg-amber-100 text-amber-800","bg-pink-100 text-pink-800","bg-indigo-100 text-indigo-800","bg-orange-100 text-orange-800","bg-teal-100 text-teal-800","bg-red-100 text-red-800","bg-cyan-100 text-cyan-800","bg-lime-100 text-lime-800","bg-rose-100 text-rose-800","bg-violet-100 text-violet-800","bg-sky-100 text-sky-800","bg-green-100 text-green-800"];
+const MON       = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+const GC  = {"5":"bg-green-100 text-green-700","4":"bg-blue-100 text-blue-700","3":"bg-yellow-100 text-yellow-700","2":"bg-red-100 text-red-700"};
+const SC  = ["bg-blue-100 text-blue-800","bg-purple-100 text-purple-800","bg-emerald-100 text-emerald-800","bg-amber-100 text-amber-800","bg-pink-100 text-pink-800","bg-indigo-100 text-indigo-800","bg-orange-100 text-orange-800","bg-teal-100 text-teal-800","bg-red-100 text-red-800","bg-cyan-100 text-cyan-800","bg-lime-100 text-lime-800","bg-rose-100 text-rose-800","bg-violet-100 text-violet-800","bg-sky-100 text-sky-800","bg-green-100 text-green-800"];
 const CBG = ["bg-blue-500","bg-pink-500","bg-emerald-500","bg-violet-500","bg-orange-500","bg-teal-500"];
+const GC2 = {"5":{bg:"#EAF3DE",tc:"#3B6D11"},"4":{bg:"#E6F1FB",tc:"#185FA5"},"3":{bg:"#FAEEDA",tc:"#854F0B"},"2":{bg:"#FCEBEB",tc:"#A32D2D"}};
 
-const uid = () => Math.random().toString(36).slice(2, 9);
-const toDay = () => new Date().toISOString().slice(0, 10);
-const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const lessonTime = n => {
-  const m = 8*60 + (n-1)*60, h = Math.floor(m/60), mm = m%60;
-  return (h<0||h>23) ? "" : `${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
-};
-const LNS = [-2,-1,0,1,2,3,4,5,6,7,8];
-const getMonday = d => { const x=new Date(d); const dy=x.getDay(); x.setDate(x.getDate()-(dy===0?6:dy-1)); x.setHours(0,0,0,0); return x; };
-const weekDates = mon => Array.from({length:6}, (_,i) => { const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
-const ds = d => d.toISOString().slice(0,10);
-const sd = s => new Date(s+"T00:00:00");
-const genCode = () => Math.random().toString(36).slice(2,8).toUpperCase();
+// ── Утилиты ─────────────────────────────────────────────────────────────────
+const uid       = () => Math.random().toString(36).slice(2, 9);
+const toDay     = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const isMobile  = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const lessonTime = n => { const m=8*60+(n-1)*60,h=Math.floor(m/60),mm=m%60; return (h<0||h>23)?"":`${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; };
+const LNS       = [-2,-1,0,1,2,3,4,5,6,7,8];
+const getMonday = d => { const x=new Date(d),dy=x.getDay(); x.setDate(x.getDate()-(dy===0?6:dy-1)); x.setHours(0,0,0,0); return x; };
+const weekDates = mon => Array.from({length:6},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+const ds        = d => { const x=new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`; };
+const sd        = s => new Date(s+"T00:00:00");
+const genCode   = () => Math.random().toString(36).slice(2,8).toUpperCase();
+const fmtDate   = s => { if(!s)return""; const p=s.split("-"); return p.length===3?`${p[2]}.${p[1]}`:s.slice(5); };
 
-// Предметы по классам
+// ── Оценки ──────────────────────────────────────────────────────────────────
+const isKR      = t => t==="test"||t==="кр";
+const gradeIcon = t => isKR(t)?"📋":t==="class"||t==="у"?"🙋":"✏️";
+const gradeLbl  = t => isKR(t)?"КР":t==="class"||t==="у"?"У":"П";
+const bc        = a => { const n=Math.round(a||0); if(n>=5)return"#1D9E75"; if(n>=4)return"#378ADD"; if(n>=3)return"#EF9F27"; return"#E24B4A"; };
+const gcl       = v => GC2[v]||{bg:"#f1f5f9",tc:"#64748b"};
+
+// ── Предметы по классам ─────────────────────────────────────────────────────
 const SUBJECTS_BY_GRADE = {
-  1:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
-  2:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
-  3:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык","Музыка","ИЗО","Физкультура","Технология"],
-  4:  ["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык","Музыка","ИЗО","Физкультура","Технология"],
-  5:  ["Русский язык","Литература","Математика","История","Природоведение","Английский язык","Музыка","ИЗО","Физкультура","Технология","ОБЖ"],
-  6:  ["Русский язык","Литература","Математика","История","География","Биология","Английский язык","Музыка","ИЗО","Физкультура","Технология","ОБЖ"],
-  7:  ["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Английский язык","Физкультура","Технология","ОБЖ","Информатика"],
-  8:  ["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","Технология","ОБЖ","Информатика"],
-  9:  ["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика"],
-  10: ["Русский язык","Литература","Алгебра и начала анализа","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика","Астрономия"],
-  11: ["Русский язык","Литература","Алгебра и начала анализа","Геометрия","История","Обществознание","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика","Астрономия"],
+  1:["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
+  2:["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
+  3:["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык","Музыка","ИЗО","Физкультура","Технология"],
+  4:["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык","Музыка","ИЗО","Физкультура","Технология"],
+  5:["Русский язык","Литература","Математика","История","Природоведение","Английский язык","Музыка","ИЗО","Физкультура","Технология","ОБЖ"],
+  6:["Русский язык","Литература","Математика","История","География","Биология","Английский язык","Музыка","ИЗО","Физкультура","Технология","ОБЖ"],
+  7:["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Английский язык","Физкультура","Технология","ОБЖ","Информатика"],
+  8:["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","Технология","ОБЖ","Информатика"],
+  9:["Русский язык","Литература","Алгебра","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика"],
+  10:["Русский язык","Литература","Алгебра и начала анализа","Геометрия","История","Обществознание","География","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика","Астрономия"],
+  11:["Русский язык","Литература","Алгебра и начала анализа","Геометрия","История","Обществознание","Биология","Физика","Химия","Английский язык","Физкультура","ОБЖ","Информатика","Астрономия"],
 };
-const gradeSubjects = g => g ? (SUBJECTS_BY_GRADE[Math.min(Math.max(g,1),11)] || null) : null;
-
+const gradeSubjects = g => g?(SUBJECTS_BY_GRADE[Math.min(Math.max(g,1),11)]||null):null;
 const INIT_SUBJS = [
   {id:"s1",name:"Русский язык",c:0},{id:"s2",name:"Литература",c:1},{id:"s3",name:"Алгебра",c:2},
   {id:"s4",name:"Геометрия",c:3},{id:"s5",name:"История",c:4},{id:"s6",name:"Обществознание",c:5},
@@ -48,16 +54,25 @@ const INIT_SUBJS = [
   {id:"s10",name:"Химия",c:9},{id:"s11",name:"Информатика",c:10},{id:"s12",name:"Английский язык",c:11},
   {id:"s13",name:"Физкультура",c:12},{id:"s14",name:"ОБЖ",c:13},{id:"s15",name:"Технология",c:14},
 ];
-const INIT_DB = { children:[], subjects:INIT_SUBJS, weeklyTemplate:[], dateSchedule:[], homework:[], grades:[], clubs:[] };
+const INIT_DB = {children:[],subjects:INIT_SUBJS,weeklyTemplate:[],dateSchedule:[],homework:[],grades:[],clubs:[]};
 
-// ── Компоненты ───────────────────────────────────────────────
-const Card = ({cls="",onClick,children}) => <div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`} onClick={onClick}>{children}</div>;
-const Empty = ({txt}) => <Card cls="py-10 text-center text-slate-400 text-sm">{txt}</Card>;
-const ST = ({children}) => <p className="text-sm font-medium text-slate-600 mb-3">{children}</p>;
-const Btn = ({cls="",...p}) => <button className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${cls}`} {...p}/>;
-const Inp = ({cls="",...p}) => <input className={`border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${cls}`} {...p}/>;
-const Sel = ({cls="",...p}) => <select className={`border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${cls}`} {...p}/>;
-const GBadge = ({v}) => <span className={`px-2 py-0.5 rounded-lg text-sm font-bold ${GC[v]||"bg-slate-100 text-slate-600"}`}>{v}</span>;
+// ── Компоненты (вне App) ─────────────────────────────────────────────────────
+const Card    = ({cls="",onClick,children}) => <div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`} onClick={onClick}>{children}</div>;
+const Empty   = ({txt}) => <Card cls="py-10 text-center text-slate-400 text-sm">{txt}</Card>;
+const ST      = ({children}) => <p className="text-sm font-medium text-slate-600 mb-3">{children}</p>;
+const Btn     = ({cls="",...p}) => <button className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${cls}`} {...p}/>;
+const Inp     = ({cls="",...p}) => <input className={`border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${cls}`} {...p}/>;
+const Sel     = ({cls="",...p}) => <select className={`border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${cls}`} {...p}/>;
+const Loader  = ({text="Загрузка..."}) => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+    <p className="text-slate-400 animate-pulse text-lg">{text}</p>
+  </div>
+);
+const GBadge = ({v,type=""}) => (
+  <span className={`px-2 py-0.5 rounded-lg text-sm font-bold inline-flex items-center gap-1 ${GC[v]||"bg-slate-100 text-slate-600"} ${isKR(type)?"ring-2 ring-current":""}`}>
+    <span className="text-xs">{gradeIcon(type)}</span>{v}
+  </span>
+);
 const GPicker = ({value,onChange}) => (
   <div className="flex gap-1">
     {["5","4","3","2"].map(g=>(
@@ -66,39 +81,36 @@ const GPicker = ({value,onChange}) => (
     ))}
   </div>
 );
-const Loader = ({text="Загрузка..."}) => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-    <p className="text-slate-400 animate-pulse text-lg">{text}</p>
-  </div>
-);
 
-// ── App ──────────────────────────────────────────────────────
+// ── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser] = useState(undefined);
-  const [userRec, setUserRec] = useState(null);
-  const [dbData, setDbData] = useState(null);
-  const [step, setStep] = useState("loading"); // loading|login|setup|join|select|app
-  const [cid, setCid] = useState(null);
-  const [tab, setTab] = useState(0);
-  const [mon, setMon] = useState(() => getMonday(new Date()));
-  const [aDate, setADate] = useState(toDay);
-  const [saving, setSaving] = useState(false);
-  const [egid, setEgid] = useState(null);
-  const [codeInput, setCodeInput] = useState("");
-  const [codeErr, setCodeErr] = useState("");
+  const [user,        setUser]        = useState(undefined);
+  const [userRec,     setUserRec]     = useState(null);
+  const [dbData,      setDbData]      = useState(null);
+  const [step,        setStep]        = useState("loading");
+  const [cid,         setCid]         = useState(null);
+  const [tab,         setTab]         = useState(0);
+  const [mon,         setMon]         = useState(()=>getMonday(new Date()));
+  const [aDate,       setADate]       = useState(toDay);
+  const [saving,      setSaving]      = useState(false);
+  const [egid,        setEgid]        = useState(null);
+  const [codeInput,   setCodeInput]   = useState("");
+  const [codeErr,     setCodeErr]     = useState("");
   const [codeLoading, setCodeLoading] = useState(false);
-  const [showCode, setShowCode] = useState(false);
-  const [newChild, setNewChild] = useState({name:"",birthYear:"",schoolYear:""});
-  const [lF, setLF] = useState({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
-  const [hwF, setHwF] = useState({subjectId:"",lessonId:"",task:"",due:toDay()});
-  const [grF, setGrF] = useState({subjectId:"",value:"5",date:toDay(),type:"class"});
-  const [clF, setClF] = useState({name:"",day:"Пн",time:""});
-  const [sjF, setSjF] = useState("");
-  const [editC, setEditC] = useState({});
-  const [selectedSubj, setSelectedSubj] = useState(null);
+  const [showCode,    setShowCode]    = useState(false);
+  const [newChild,    setNewChild]    = useState({name:"",birthYear:"",schoolYear:""});
+  const [lF,          setLF]          = useState({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
+  const [hwF,         setHwF]         = useState({subjectId:"",lessonId:"",task:"",due:toDay()});
+  const [grF,         setGrF]         = useState({subjectId:"",value:"5",date:toDay(),type:"class"});
+  const [clF,         setClF]         = useState({name:"",day:"Пн",time:""});
+  const [sjF,         setSjF]         = useState("");
+  const [editC,       setEditC]       = useState({});
+  const [selSubj,     setSelSubj]     = useState(null);
+  const [sOrdState,   setSOrdState]   = useState(null); // {cid, order}
+  const [sCollState,  setSCollState]  = useState(null); // {cid, coll: Set}
 
-  // Auth
-  useEffect(() => {
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  useEffect(()=>{
     getRedirectResult(auth).catch(console.error);
     const unsub = onAuthStateChanged(auth, async u => {
       setUser(u);
@@ -110,70 +122,61 @@ export default function App() {
           const rec = uDoc.data();
           setUserRec(rec);
           const fDoc = await getDoc(doc(db,"families",rec.familyId));
-          if (fDoc.exists()) {
-            setDbData(fDoc.data());
-            if (rec.childId) setCid(rec.childId);
-            setStep("select");
-          } else setStep("setup");
+          if (fDoc.exists()) { setDbData(fDoc.data()); if(rec.childId)setCid(rec.childId); if(uDoc.data().statsPrefs)setStatsPrefs(uDoc.data().statsPrefs); setStep("select"); }
+          else setStep("setup");
         } else setStep("setup");
       } catch(e) { console.error(e); setStep("setup"); }
     });
     return unsub;
-  }, []);
+  },[]);
 
   const save = async d => {
     setDbData(d); setSaving(true);
-    try { await setDoc(doc(db,"families",userRec.familyId), d); } catch(e) { console.error(e); }
-    setTimeout(() => setSaving(false), 600);
+    try { await setDoc(doc(db,"families",userRec.familyId),d); } catch(e){console.error(e);}
+    setTimeout(()=>setSaving(false),600);
   };
-
+  const saveStatsPrefs = async prefs => {
+    setStatsPrefs(prefs);
+    try { await setDoc(doc(db,"users",user.uid),{statsPrefs:prefs},{merge:true}); } catch(e){console.error(e);}
+  };
   const login = () => isMobile()
-    ? signInWithRedirect(auth, provider).catch(console.error)
-    : signInWithPopup(auth, provider).catch(console.error);
-
-  const logout = async () => {
-    await signOut(auth);
-    setStep("login"); setCid(null); setUserRec(null); setDbData(null);
-  };
+    ? signInWithRedirect(auth,provider).catch(console.error)
+    : signInWithPopup(auth,provider).catch(console.error);
+  const logout = async () => { await signOut(auth); setStep("login"); setCid(null); setUserRec(null); setDbData(null); };
 
   const createFamily = async () => {
     setCodeLoading(true);
     try {
-      const code = genCode(), familyId = user.uid;
-      const local = localStorage.getItem("school-db-v4");
-      const initData = { ...(local ? JSON.parse(local) : INIT_DB), ownerId:user.uid, familyCode:code, members:[] };
-      await setDoc(doc(db,"families",familyId), initData);
-      await setDoc(doc(db,"familyCodes",code), { familyId });
-      await setDoc(doc(db,"users",user.uid), { familyId, role:"owner" });
-      setUserRec({ familyId, role:"owner" });
-      setDbData(initData);
-      setStep("select");
-    } catch(e) { console.error(e); }
+      const code=genCode(), familyId=user.uid;
+      const initData={...INIT_DB,ownerId:user.uid,familyCode:code,members:[]};
+      await setDoc(doc(db,"families",familyId),initData);
+      await setDoc(doc(db,"familyCodes",code),{familyId});
+      await setDoc(doc(db,"users",user.uid),{familyId,role:"owner"});
+      setUserRec({familyId,role:"owner"}); setDbData(initData); setStep("select");
+    } catch(e){console.error(e);}
     setCodeLoading(false);
   };
 
   const joinFamily = async () => {
-    const code = codeInput.trim().toUpperCase();
-    if (code.length < 6) { setCodeErr("Введи 6-значный код"); return; }
+    const code=codeInput.trim().toUpperCase();
+    if (code.length<6){setCodeErr("Введи 6-значный код");return;}
     setCodeLoading(true); setCodeErr("");
     try {
-      const cDoc = await getDoc(doc(db,"familyCodes",code));
-      if (!cDoc.exists()) { setCodeErr("Код не найден. Проверь и попробуй снова"); setCodeLoading(false); return; }
-      const { familyId } = cDoc.data();
-      await updateDoc(doc(db,"families",familyId), { members: arrayUnion(user.uid) });
-      await setDoc(doc(db,"users",user.uid), { familyId, role:"member" });
-      const fDoc = await getDoc(doc(db,"families",familyId));
-      setDbData(fDoc.data());
-      setUserRec({ familyId, role:"member" });
-      setStep("select");
-    } catch(e) { console.error(e); setCodeErr("Ошибка. Попробуй снова"); }
+      const cDoc=await getDoc(doc(db,"familyCodes",code));
+      if (!cDoc.exists()){setCodeErr("Код не найден. Проверь и попробуй снова");setCodeLoading(false);return;}
+      const {familyId}=cDoc.data();
+      await updateDoc(doc(db,"families",familyId),{members:arrayUnion(user.uid)});
+      await setDoc(doc(db,"users",user.uid),{familyId,role:"member"});
+      const fDoc=await getDoc(doc(db,"families",familyId));
+      setDbData(fDoc.data()); setUserRec({familyId,role:"member"}); setStep("select");
+    } catch(e){console.error(e);setCodeErr("Ошибка. Попробуй снова");}
     setCodeLoading(false);
   };
 
   const selectProfile = async ch => {
-    setCid(ch.id); setStep("app"); setTab(0);
-    if (userRec?.role === "member") {
-      try { await setDoc(doc(db,"users",user.uid), {...userRec, childId:ch.id}, {merge:true}); } catch {}
+    setCid(ch.id); setStep("app");
+    if (userRec?.role==="member") {
+      try{await setDoc(doc(db,"users",user.uid),{...userRec,childId:ch.id},{merge:true});}catch{}
     }
   };
 
@@ -185,13 +188,12 @@ export default function App() {
       await deleteDoc(doc(db,"familyCodes",dbData.familyCode));
       await deleteDoc(doc(db,"users",user.uid));
       setDbData(null); setUserRec(null); setStep("setup");
-    } catch(e) { console.error(e); alert("Ошибка при удалении."); }
+    } catch(e){console.error(e);alert("Ошибка при удалении.");}
   };
 
-  // ── Загрузка ─────────────────────────────────────────────
-  if (step==="loading" || user===undefined) return <Loader/>;
+  // ── Экраны загрузки/входа/настройки ────────────────────────────────────────
+  if (step==="loading"||user===undefined) return <Loader/>;
 
-  // ── Вход ─────────────────────────────────────────────────
   if (step==="login") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-10 max-w-sm w-full text-center">
@@ -212,7 +214,6 @@ export default function App() {
     </div>
   );
 
-  // ── Первый вход ──────────────────────────────────────────
   if (step==="setup") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
@@ -225,9 +226,9 @@ export default function App() {
         <div className="space-y-3">
           <button onClick={createFamily} disabled={codeLoading}
             className="w-full bg-blue-500 text-white rounded-xl px-6 py-4 text-sm font-medium hover:bg-blue-600 disabled:opacity-60 transition-all">
-            {codeLoading ? "Создаём..." : "👨‍👩‍👧‍👦 Я родитель — создать семью"}
+            {codeLoading?"Создаём...":"👨‍👩‍👧‍👦 Я родитель — создать семью"}
           </button>
-          <button onClick={() => setStep("join")}
+          <button onClick={()=>setStep("join")}
             className="w-full bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-4 text-sm font-medium hover:bg-slate-50 transition-all">
             🎒 Я ребёнок — войти по коду
           </button>
@@ -237,11 +238,10 @@ export default function App() {
     </div>
   );
 
-  // ── Ввод кода ────────────────────────────────────────────
   if (step==="join") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
-        <button onClick={() => setStep("setup")} className="text-slate-400 text-sm mb-4 hover:text-slate-600">← Назад</button>
+        <button onClick={()=>setStep("setup")} className="text-slate-400 text-sm mb-4 hover:text-slate-600">← Назад</button>
         <div className="text-center mb-6">
           <div className="text-5xl mb-3">🔑</div>
           <h1 className="text-xl font-bold text-slate-800">Войти в семью</h1>
@@ -253,10 +253,10 @@ export default function App() {
           onChange={e=>{setCodeInput(e.target.value.toUpperCase());setCodeErr("");}}
           onKeyDown={e=>e.key==="Enter"&&joinFamily()}
         />
-        {codeErr && <p className="text-red-500 text-xs text-center mb-3">{codeErr}</p>}
+        {codeErr&&<p className="text-red-500 text-xs text-center mb-3">{codeErr}</p>}
         <button onClick={joinFamily} disabled={codeLoading||codeInput.length<6}
           className="w-full bg-blue-500 text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-blue-600 disabled:opacity-50 mt-2 transition-all">
-          {codeLoading ? "Проверяем..." : "Войти →"}
+          {codeLoading?"Проверяем...":"Войти →"}
         </button>
         <button onClick={logout} className="w-full text-slate-300 text-xs mt-4 hover:text-slate-400">Выйти</button>
       </div>
@@ -265,56 +265,53 @@ export default function App() {
 
   if (!dbData) return <Loader text="Загрузка данных семьи..."/>;
 
-  const { children, subjects, weeklyTemplate, dateSchedule, homework, grades, clubs } = dbData;
-  const isOwner = userRec?.role === "owner";
-  const cbg = idx => CBG[(idx||0)%CBG.length];
-  const subj = id => subjects.find(s=>s.id===id);
-  const sc = s => s ? SC[s.c%SC.length] : "bg-slate-100 text-slate-600";
-  const upd = patch => save({...dbData, ...patch});
+  const {children,subjects,weeklyTemplate,dateSchedule,homework,grades,clubs} = dbData;
+  const isOwner = userRec?.role==="owner";
+  const cbg     = idx => CBG[(idx||0)%CBG.length];
+  const subj    = id => subjects.find(s=>s.id===id);
+  const sc      = s => s?SC[s.c%SC.length]:"bg-slate-100 text-slate-600";
+  const upd     = patch => save({...dbData,...patch});
   const todayStr = toDay();
 
-  // ── Выбор профиля ────────────────────────────────────────
+  // ── Выбор профиля ────────────────────────────────────────────────────────
   if (step==="select") return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-slate-700 mb-2">👋 Привет!</h1>
         <p className="text-slate-400">Выбери свой профиль</p>
         <p className="text-xs text-slate-300 mt-1">{user.email}</p>
-        {isOwner && <span className="inline-block mt-2 bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full">👨‍👩‍👧‍👦 Родитель</span>}
+        {isOwner&&<span className="inline-block mt-2 bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full">👨‍👩‍👧‍👦 Родитель</span>}
       </div>
-
-      {children.length === 0
-        ? <div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6">
-            <p className="text-slate-400 text-sm">{isOwner ? "Добавьте профили детей в разделе «Семья»." : "Попросите родителя добавить ваш профиль."}</p>
-          </div>
-        : <div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
-            {children.map(ch => (
-              <button key={ch.id} onClick={() => selectProfile(ch)}
-                className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-md active:scale-95 transition-all">
-                <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{ch.name[0].toUpperCase()}</div>
-                <span className="text-slate-700 font-semibold text-sm">{ch.name}</span>
-                {ch.grade && <span className="text-xs text-slate-400">{ch.grade} класс</span>}
-                {ch.birthYear && !ch.grade && <span className="text-xs text-slate-400">{ch.birthYear} г.р.</span>}
-              </button>
-            ))}
-          </div>
-      }
-
-      <div className="flex flex-col items-center gap-3 w-full max-w-xs">
-        {isOwner && (
-          <>
-            <button onClick={() => setShowCode(v=>!v)}
-              className="w-full bg-white border border-slate-200 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
-              {showCode ? "Скрыть код" : "🔑 Показать код для детей"}
+      {children.length===0
+        ?<div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6">
+          <p className="text-slate-400 text-sm">{isOwner?"Добавьте профили детей в разделе «Семья».":"Попросите родителя добавить ваш профиль."}</p>
+        </div>
+        :<div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
+          {children.map(ch=>(
+            <button key={ch.id} onClick={()=>selectProfile(ch)}
+              className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-md active:scale-95 transition-all">
+              <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{ch.name[0].toUpperCase()}</div>
+              <span className="text-slate-700 font-semibold text-sm">{ch.name}</span>
+              {ch.grade&&<span className="text-xs text-slate-400">{ch.grade} класс</span>}
             </button>
-            {showCode && (
+          ))}
+        </div>
+      }
+      <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+        {isOwner&&(
+          <>
+            <button onClick={()=>setShowCode(v=>!v)}
+              className="w-full bg-white border border-slate-200 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
+              {showCode?"Скрыть код":"🔑 Показать код для детей"}
+            </button>
+            {showCode&&(
               <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
                 <p className="text-xs text-amber-600 mb-1">Код семьи:</p>
                 <p className="text-3xl font-bold tracking-[0.2em] text-amber-800">{dbData.familyCode}</p>
                 <p className="text-xs text-amber-500 mt-1">Вводится один раз при первом входе</p>
               </div>
             )}
-            <button onClick={() => { setStep("app"); setTab(6); }}
+            <button onClick={()=>{setStep("app");setTab(6);}}
               className="w-full bg-amber-100 text-amber-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-amber-200">
               ⚙️ Управление семьёй
             </button>
@@ -325,36 +322,29 @@ export default function App() {
     </div>
   );
 
-  // ── Основной экран ────────────────────────────────────────
-  const chTpl  = weeklyTemplate.filter(l => l.childId===cid);
-  const chHw   = homework.filter(h => h.childId===cid);
-  const chGr   = grades.filter(g => g.childId===cid);
-  const chCl   = clubs.filter(c => c.childId===cid);
-  const schSubjIds = [...new Set(chTpl.map(l => l.subjectId))];
-  const schSubjs = subjects.filter(s => schSubjIds.includes(s.id));
+  // ── Основное приложение ──────────────────────────────────────────────────
+  const chTpl      = weeklyTemplate.filter(l=>l.childId===cid);
+  const chHw       = homework.filter(h=>h.childId===cid);
+  const chGr       = grades.filter(g=>g.childId===cid);
+  const chCl       = clubs.filter(c=>c.childId===cid);
+  const schSubjIds = [...new Set(chTpl.map(l=>l.subjectId))];
+  const schSubjs   = subjects.filter(s=>schSubjIds.includes(s.id));
+  const activeCh   = children.find(c=>c.id===cid);
 
   const lessonsFor = dateStr => {
-    const d = sd(dateStr), di = (d.getDay()+6)%7;
-    if (di >= 6) return [];
-    return [...chTpl.filter(l => l.day===DAYS[di]), ...(dateSchedule||[]).filter(l => l.childId===cid&&l.date===dateStr)]
-      .sort((a,b) => (+a.lessonNum||99)-(+b.lessonNum||99));
+    const d=sd(dateStr),di=(d.getDay()+6)%7;
+    if (di>=6) return [];
+    return [...chTpl.filter(l=>l.day===DAYS[di]),...(dateSchedule||[]).filter(l=>l.childId===cid&&l.date===dateStr)]
+      .sort((a,b)=>(+a.lessonNum||99)-(+b.lessonNum||99));
   };
-
-  const hwPending = chHw.filter(h => !h.done).length;
-  const wDates = weekDates(mon);
-  const activeDay = DAYS[Math.min((sd(aDate).getDay()+6)%7, 5)];
-  const w0=wDates[0], w5=wDates[5];
-  const wLabel = w0.getMonth()===w5.getMonth()
-    ? `${w0.getDate()}–${w5.getDate()} ${MON[w0.getMonth()]} ${w0.getFullYear()}`
-    : `${w0.getDate()} ${MON[w0.getMonth()]} – ${w5.getDate()} ${MON[w5.getMonth()]}`;
 
   const sjGrades = sid => {
-    const fHw = chHw.filter(h=>h.subjectId===sid&&h.grade).map(h=>({id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}));
-    return [...fHw, ...chGr.filter(g=>g.subjectId===sid)].sort((a,b)=>b.date.localeCompare(a.date));
+    const fHw=chHw.filter(h=>h.subjectId===sid&&h.grade).map(h=>({id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}));
+    return [...fHw,...chGr.filter(g=>g.subjectId===sid)].sort((a,b)=>b.date.localeCompare(a.date));
   };
   const avgGrade = sid => {
-    const gs = sjGrades(sid).map(g=>+g.value).filter(Boolean);
-    return gs.length ? (gs.reduce((a,b)=>a+b,0)/gs.length).toFixed(1) : null;
+    const gs=sjGrades(sid).map(g=>+g.value).filter(Boolean);
+    return gs.length?(gs.reduce((a,b)=>a+b,0)/gs.length).toFixed(1):null;
   };
   const delGrade = g => {
     if (g.type==="hw") upd({homework:homework.map(h=>h.id===g.hwId?{...h,grade:null}:h)});
@@ -362,27 +352,40 @@ export default function App() {
     setEgid(null);
   };
   const chgGrade = (g,v) => {
-    if (!v) { delGrade(g); return; }
+    if (!v){delGrade(g);return;}
     if (g.type==="hw") upd({homework:homework.map(h=>h.id===g.hwId?{...h,grade:v}:h)});
     else upd({grades:grades.map(x=>x.id===g.id?{...x,value:v}:x)});
     setEgid(null);
   };
 
   const GChip = ({g}) => {
-    const isE = egid===g.id;
+    const isE=egid===g.id;
     return (
       <div className="relative">
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs cursor-pointer ${GC[g.value]||"bg-slate-100"} ${isOwner?"hover:ring-2 hover:ring-offset-1 hover:ring-current":""}`}
-          onClick={e=>{e.stopPropagation(); isOwner&&setEgid(isE?null:g.id);}}>
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs cursor-pointer ${GC[g.value]||"bg-slate-100"} ${isKR(g.type)?"ring-2 ring-current":""} ${isOwner?"hover:ring-2 hover:ring-offset-1 hover:ring-current":""}`}
+          onClick={e=>{e.stopPropagation();isOwner&&setEgid(isE?null:g.id);}}>
+          <span className="text-xs">{gradeIcon(g.type)}</span>
           <span className="font-bold text-sm">{g.value}</span>
-          <span className="opacity-60">{g.type==="hw"?"дз":g.type==="test"?"к/р":"уст"}</span>
-          {g.date && <span className="opacity-50">{g.date.slice(5)}</span>}
-          {isOwner && <span className="opacity-40 ml-0.5">✎</span>}
+          {g.date&&<span className="opacity-50">{fmtDate(g.date)}</span>}
+          {isOwner&&<span className="opacity-40 ml-0.5">✎</span>}
         </div>
-        {isE && (
+        {isE&&(
           <div className="absolute z-20 top-full mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-3 min-w-max">
             <p className="text-xs text-slate-400 mb-2">Изменить оценку</p>
             <GPicker value={g.value} onChange={v=>chgGrade(g,v)}/>
+            {g.type!=="hw"&&(
+              <div className="mt-2">
+                <p className="text-xs text-slate-400 mb-1.5">Тип</p>
+                <div className="flex gap-1 flex-wrap">
+                  {[["class","Устно"],["test","КР"],["hw","Письменно"]].map(([val,lbl])=>(
+                    <button key={val} onClick={()=>upd({grades:grades.map(x=>x.id===g.id?{...x,type:val}:x)})}
+                      className={"px-2.5 py-1 rounded-lg text-xs border transition-all "+(g.type===val?"bg-blue-500 text-white border-blue-500":"bg-white text-slate-500 border-slate-200 hover:border-blue-300")}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button onClick={()=>delGrade(g)} className="mt-2 w-full text-xs text-red-400 py-1 border border-red-100 rounded-lg hover:bg-red-50">Удалить</button>
           </div>
         )}
@@ -392,52 +395,47 @@ export default function App() {
 
   const SBadge = ({sid}) => { const s=subj(sid); return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>; };
 
-  const activeCh = children.find(c=>c.id===cid);
+  const hwPending = chHw.filter(h=>!h.done).length;
+  const wDates    = weekDates(mon);
+  const activeDay = DAYS[Math.min((sd(aDate).getDay()+6)%7,5)];
+  const w0=wDates[0],w5=wDates[5];
+  const wLabel = w0.getMonth()===w5.getMonth()
+    ?`${w0.getDate()}–${w5.getDate()} ${MON[w0.getMonth()]} ${w0.getFullYear()}`
+    :`${w0.getDate()} ${MON[w0.getMonth()]} – ${w5.getDate()} ${MON[w5.getMonth()]}`;
 
-  // Предметы для добавления урока
-  const gSubjs = gradeSubjects(activeCh?.grade);
+  const gSubjs         = gradeSubjects(activeCh?.grade);
   const schedSubjNames = [...new Set(chTpl.map(l=>subj(l.subjectId)?.name).filter(Boolean))];
-  const availSubjNames = gSubjs ? [...new Set([...gSubjs, ...schedSubjNames])] : subjects.map(s=>s.name);
-
-  const getOrMakeSubj = name => {
-    const ex = subjects.find(s=>s.name===name);
-    if (ex) return {subjects, subjectId:ex.id};
-    const ns = {id:uid(), name, c:subjects.length%SC.length};
-    return {subjects:[...subjects, ns], subjectId:ns.id};
+  const availSubjNames = gSubjs?[...new Set([...gSubjs,...schedSubjNames])]:subjects.map(s=>s.name);
+  const getOrMakeSubj  = name => {
+    const ex=subjects.find(s=>s.name===name);
+    if (ex) return {subjects,subjectId:ex.id};
+    const ns={id:uid(),name,c:subjects.length%SC.length};
+    return {subjects:[...subjects,ns],subjectId:ns.id};
   };
 
-  // Предметы для ДЗ — по дате задания
-  const hwDueDay = (() => { const d=sd(hwF.due); const i=(d.getDay()+6)%7; return i<6?DAYS[i]:null; })();
-  const hwDueLessons = hwDueDay ? lessonsFor(hwF.due) : [];
-  const hwSubjIds = hwDueLessons.length ? [...new Set(hwDueLessons.map(l=>l.subjectId))] : schSubjIds;
+  const hwDueDay    = (()=>{ const d=sd(hwF.due),i=(d.getDay()+6)%7; return i<6?DAYS[i]:null; })();
+  const hwDueLessons = hwDueDay?lessonsFor(hwF.due):[];
+  const hwSubjIds   = hwDueLessons.length?[...new Set(hwDueLessons.map(l=>l.subjectId))]:schSubjIds;
+  const activeLessons = lessonsFor(aDate);
 
-  // Tabs: 0=Расписание 1=Задания 2=Оценки 3=Статистика 4=Кружки 5=Предметы(owner) 6=Семья(owner)
   const TABS = isOwner
-    ? ["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]
-    : ["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки"];
+    ?["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]
+    :["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки"];
 
   const addChild = () => {
     if (!newChild.name.trim()) return;
-    const by=parseInt(newChild.birthYear)||null, sy=parseInt(newChild.schoolYear)||null;
-    const grade = (sy&&sy<=new Date().getFullYear()) ? (new Date().getFullYear()-sy+1) : null;
-    let newSubjects = [...subjects];
-    if (grade) {
-      (gradeSubjects(grade)||[]).forEach(name => {
-        if (!newSubjects.find(s=>s.name===name))
-          newSubjects.push({id:uid(), name, c:newSubjects.length%SC.length});
-      });
-    }
-    upd({subjects:newSubjects, children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
+    const by=parseInt(newChild.birthYear)||null,sy=parseInt(newChild.schoolYear)||null;
+    const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
+    let newSubjects=[...subjects];
+    if (grade)(gradeSubjects(grade)||[]).forEach(name=>{if(!newSubjects.find(s=>s.name===name))newSubjects.push({id:uid(),name,c:newSubjects.length%SC.length});});
+    upd({subjects:newSubjects,children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
     setNewChild({name:"",birthYear:"",schoolYear:""});
   };
-
   const remChild = id => {
     if (!window.confirm("Удалить профиль и все данные?")) return;
     upd({children:children.filter(c=>c.id!==id),weeklyTemplate:weeklyTemplate.filter(l=>l.childId!==id),dateSchedule:(dateSchedule||[]).filter(l=>l.childId!==id),homework:homework.filter(h=>h.childId!==id),grades:grades.filter(g=>g.childId!==id),clubs:clubs.filter(c=>c.childId!==id)});
     if (cid===id) setCid(null);
   };
-
-  const activeLessons = lessonsFor(aDate);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans" onClick={()=>egid&&setEgid(null)}>
@@ -447,26 +445,26 @@ export default function App() {
         <div className="flex items-center gap-2 mb-4">
           <button onClick={()=>setStep("select")} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
           {isOwner
-            ? <div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
-                {children.map(ch => (
-                  <button key={ch.id} onClick={()=>setCid(ch.id)}
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${cid===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
-                    <span className="font-bold">{ch.name[0]}</span><span>{ch.name}</span>
-                  </button>
-                ))}
-              </div>
-            : <div className="flex items-center gap-2 flex-1">
-                {activeCh && <div className={`w-8 h-8 rounded-full ${cbg(activeCh.colorIdx)} flex items-center justify-center text-white font-bold text-sm`}>{activeCh.name[0]}</div>}
-                <span className="font-semibold text-slate-700">{activeCh?.name||"Дневник"}</span>
-              </div>
+            ?<div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
+              {children.map(ch=>(
+                <button key={ch.id} onClick={()=>setCid(ch.id)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${cid===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
+                  <span className="font-bold">{ch.name[0]}</span><span>{ch.name}</span>
+                </button>
+              ))}
+            </div>
+            :<div className="flex items-center gap-2 flex-1">
+              {activeCh&&<div className={`w-8 h-8 rounded-full ${cbg(activeCh.colorIdx)} flex items-center justify-center text-white font-bold text-sm`}>{activeCh.name[0]}</div>}
+              <span className="font-semibold text-slate-700">{activeCh?.name||"Дневник"}</span>
+            </div>
           }
           <span className="text-xs text-slate-300">{saving?"💾":"✅"}</span>
-          {isOwner && <span className="bg-amber-100 text-amber-700 rounded-xl px-2 py-1 text-xs font-medium">👨‍👩‍👧‍👦</span>}
+          {isOwner&&<span className="bg-amber-100 text-amber-700 rounded-xl px-2 py-1 text-xs font-medium">👨‍👩‍👧‍👦</span>}
         </div>
 
         {/* Табы */}
         <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
-          {TABS.map((t,i) => (
+          {TABS.map((t,i)=>(
             <button key={i} onClick={()=>setTab(i)}
               className={`flex-shrink-0 flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${tab===i?"bg-blue-500 text-white shadow":"text-slate-500 hover:bg-slate-100"}`}>
               {t}{i===1&&hwPending>0&&<span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1">{hwPending}</span>}
@@ -474,8 +472,8 @@ export default function App() {
           ))}
         </div>
 
-        {/* ── TAB 0: РАСПИСАНИЕ ── */}
-        {tab===0 && (
+        {/* TAB 0: РАСПИСАНИЕ */}
+        {tab===0&&(
           <div>
             <div className="flex items-center justify-between mb-3">
               <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
@@ -486,14 +484,14 @@ export default function App() {
               <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
             </div>
             <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-              {wDates.map((d,i) => {
-                const dstr=ds(d), isToday=dstr===todayStr, isActive=dstr===aDate, has=lessonsFor(dstr).length>0;
-                return (
+              {wDates.map((d,i)=>{
+                const dstr=ds(d),isToday=dstr===todayStr,isActive=dstr===aDate,has=lessonsFor(dstr).length>0;
+                return(
                   <button key={i} onClick={()=>setADate(dstr)}
                     className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-blue-500 text-white shadow-md":isToday?"bg-blue-100 text-blue-700 border-2 border-blue-300":"bg-white text-slate-600 hover:bg-slate-100"}`}>
                     <span>{DAYS[i]}</span>
                     <span className={`text-xs font-normal mt-0.5 ${isActive?"text-blue-100":isToday?"text-blue-600":"text-slate-400"}`}>{d.getDate()}</span>
-                    {has && <span className={`w-1.5 h-1.5 rounded-full mt-1 ${isActive?"bg-blue-200":"bg-blue-400"}`}/>}
+                    {has&&<span className={`w-1.5 h-1.5 rounded-full mt-1 ${isActive?"bg-blue-200":"bg-blue-400"}`}/>}
                   </button>
                 );
               })}
@@ -501,39 +499,36 @@ export default function App() {
             <Card cls="mb-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-slate-700">{DAYS_FULL[DAYS.indexOf(activeDay)]}, {sd(aDate).getDate()} {MON[sd(aDate).getMonth()]}</h2>
-                {aDate===todayStr && <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Сегодня</span>}
+                {aDate===todayStr&&<span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Сегодня</span>}
               </div>
               {activeLessons.length===0
-                ? <p className="text-slate-400 text-sm text-center py-4">Уроков нет</p>
-                : activeLessons.map(l => {
-                    const s=subj(l.subjectId), isOnce=!!l.date;
-                    const lHw=chHw.filter(h=>h.subjectId===l.subjectId&&(h.date===aDate||h.lessonId===l.id));
-                    const lGr=sjGrades(l.subjectId).slice(0,3);
-                    return (
-                      <div key={l.id} className="mb-2 flex items-center gap-2 p-2.5 rounded-xl bg-slate-50">
-                        <span className="text-slate-400 text-xs w-5 text-center font-bold">{l.lessonNum}</span>
-                        {l.time && <span className="text-slate-400 text-xs w-10">{l.time}</span>}
-                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s?.name||"?"}</span>
-                        {isOnce && <span className="text-purple-400 text-xs">📌</span>}
-                        {lHw.some(h=>!h.done) && <span className="text-orange-400 text-xs">📝</span>}
-                        {lGr[0] && <GBadge v={lGr[0].value}/>}
-                        {isOwner && <button onClick={()=>isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
-                      </div>
-                    );
-                  })
+                ?<p className="text-slate-400 text-sm text-center py-4">Уроков нет</p>
+                :activeLessons.map(l=>{
+                  const s=subj(l.subjectId),isOnce=!!l.date;
+                  const lGr=sjGrades(l.subjectId).slice(0,1);
+                  return(
+                    <div key={l.id} className="mb-2 flex items-center gap-2 p-2.5 rounded-xl bg-slate-50">
+                      <div className={`w-1 self-stretch rounded-full ${sc(s).includes("blue")?"bg-blue-400":sc(s).includes("purple")?"bg-purple-400":sc(s).includes("emerald")?"bg-emerald-400":sc(s).includes("amber")?"bg-amber-400":"bg-slate-300"}`}/>
+                      {l.lessonNum&&<span className="text-slate-400 text-xs w-5 text-center font-bold">{l.lessonNum}</span>}
+                      {l.time&&<span className="text-slate-400 text-xs w-10">{l.time}</span>}
+                      <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s?.name||"?"}</span>
+                      {isOnce&&<span className="text-purple-400 text-xs">📌</span>}
+                      {chHw.filter(h=>h.subjectId===l.subjectId&&!h.done).length>0&&<span className="text-orange-400 text-xs">📝</span>}
+                      {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
+                      {isOwner&&<button onClick={()=>isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                    </div>
+                  );
+                })
               }
             </Card>
-            {isOwner && (
+            {isOwner&&(
               <Card>
                 <ST>Добавить урок</ST>
                 <div className="space-y-2">
-                  {gSubjs && <p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎓 Предметы для {activeCh?.grade} класса</p>}
+                  {gSubjs&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎓 Предметы для {activeCh?.grade} класса</p>}
                   <Sel cls="w-full" value={lF.subjectId} onChange={e=>setLF(p=>({...p,subjectId:e.target.value}))}>
                     <option value="">Выберите предмет...</option>
-                    {availSubjNames.map(name => {
-                      const s=subjects.find(x=>x.name===name);
-                      return <option key={name} value={s?.id||"__new__"+name}>{name}</option>;
-                    })}
+                    {availSubjNames.map(name=>{const s=subjects.find(x=>x.name===name);return <option key={name} value={s?.id||"__new__"+name}>{name}</option>;})}
                   </Sel>
                   <div className="flex gap-2 items-end">
                     <div className="flex flex-col gap-1">
@@ -554,72 +549,68 @@ export default function App() {
                     </label>
                     <Btn onClick={()=>{
                       if (!lF.subjectId) return;
-                      let sid=lF.subjectId, newSubjs=subjects;
-                      if (lF.subjectId.startsWith("__new__")) {
-                        const r=getOrMakeSubj(lF.subjectId.replace("__new__",""));
-                        newSubjs=r.subjects; sid=r.subjectId;
-                      }
-                      if (lF.repeat) upd({subjects:newSubjs, weeklyTemplate:[...weeklyTemplate,{id:uid(),childId:cid,subjectId:sid,day:activeDay,lessonNum:+lF.lessonNum,time:lF.time}]});
-                      else upd({subjects:newSubjs, dateSchedule:[...(dateSchedule||[]),{id:uid(),childId:cid,date:aDate,subjectId:sid,lessonNum:+lF.lessonNum,time:lF.time}]});
+                      let sid=lF.subjectId,newSubjs=subjects;
+                      if (lF.subjectId.startsWith("__new__")){const r=getOrMakeSubj(lF.subjectId.replace("__new__",""));newSubjs=r.subjects;sid=r.subjectId;}
+                      if (lF.repeat) upd({subjects:newSubjs,weeklyTemplate:[...weeklyTemplate,{id:uid(),childId:cid,subjectId:sid,day:activeDay,lessonNum:+lF.lessonNum,time:lF.time}]});
+                      else upd({subjects:newSubjs,dateSchedule:[...(dateSchedule||[]),{id:uid(),childId:cid,date:aDate,subjectId:sid,lessonNum:+lF.lessonNum,time:lF.time}]});
                       setLF({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
                     }} cls="bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
                   </div>
-                  {!lF.repeat && <p className="text-xs text-purple-500 bg-purple-50 rounded-lg px-3 py-1.5">📌 Только на {sd(aDate).getDate()} {MON[sd(aDate).getMonth()]}</p>}
+                  {!lF.repeat&&<p className="text-xs text-purple-500 bg-purple-50 rounded-lg px-3 py-1.5">📌 Только на {sd(aDate).getDate()} {MON[sd(aDate).getMonth()]}</p>}
                 </div>
               </Card>
             )}
           </div>
         )}
 
-        {/* ── TAB 1: ЗАДАНИЯ ── */}
-        {tab===1 && (
+        {/* TAB 1: ЗАДАНИЯ */}
+        {tab===1&&(
           <div>
             <div className="space-y-3 mb-4">
-              {chHw.length===0 ? <Empty txt="Заданий нет 🎉"/>
-                : [...chHw].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(h => (
-                  <Card key={h.id} cls={h.done?"opacity-70":""}>
-                    <div className="flex items-start gap-3">
-                      <button onClick={()=>upd({homework:homework.map(x=>x.id===h.id?{...x,done:!x.done}:x)})}
-                        className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"border-slate-300 hover:border-green-400"}`}>
-                        {h.done && "✓"}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <SBadge sid={h.subjectId}/>
-                          {h.date && <span className="text-xs text-slate-400">до {h.date}</span>}
-                          {h.grade && (isOwner ? <GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}}/> : <GBadge v={h.grade}/>)}
-                        </div>
-                        <p className={`text-sm text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
-                        {h.comment && (
-                          <div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                            <p className="text-xs text-amber-600 font-medium">💬 Родитель:</p>
-                            <p className="text-xs text-amber-800 mt-0.5">{h.comment}</p>
-                          </div>
-                        )}
-                        {isOwner && (
-                          <div className="mt-3 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <GPicker value={h.grade} onChange={g=>upd({homework:homework.map(x=>x.id===h.id?{...x,grade:g}:x)})}/>
-                              <span className="text-xs text-slate-400">оценка</span>
-                            </div>
-                            <div className="flex gap-2 items-end">
-                              <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
-                                placeholder="Комментарий для ребёнка..." rows={2}
-                                value={editC[h.id]??h.comment}
-                                onChange={e=>setEditC(p=>({...p,[h.id]:e.target.value}))}/>
-                              <button onClick={()=>{upd({homework:homework.map(x=>x.id===h.id?{...x,comment:editC[h.id]??h.comment}:x)});setEditC(p=>({...p,[h.id]:undefined}));}}
-                                className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
-                            </div>
-                          </div>
-                        )}
+              {chHw.length===0?<Empty txt="Заданий нет 🎉"/>
+                :[...chHw].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(h=>(
+                <Card key={h.id} cls={h.done?"opacity-70":""}>
+                  <div className="flex items-start gap-3">
+                    <button onClick={()=>upd({homework:homework.map(x=>x.id===h.id?{...x,done:!x.done}:x)})}
+                      className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"border-slate-300 hover:border-green-400"}`}>
+                      {h.done&&"✓"}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <SBadge sid={h.subjectId}/>
+                        {h.date&&<span className="text-xs text-slate-400">до {fmtDate(h.date)}</span>}
+                        {h.grade&&(isOwner?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}}/>:<GBadge v={h.grade} type="hw"/>)}
                       </div>
-                      {isOwner && <button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                      <p className={`text-sm text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
+                      {h.comment&&(
+                        <div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                          <p className="text-xs text-amber-600 font-medium">💬 Родитель:</p>
+                          <p className="text-xs text-amber-800 mt-0.5">{h.comment}</p>
+                        </div>
+                      )}
+                      {isOwner&&(
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <GPicker value={h.grade} onChange={g=>upd({homework:homework.map(x=>x.id===h.id?{...x,grade:g}:x)})}/>
+                            <span className="text-xs text-slate-400">оценка</span>
+                          </div>
+                          <div className="flex gap-2 items-end">
+                            <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                              placeholder="Комментарий для ребёнка..." rows={2}
+                              value={editC[h.id]??h.comment}
+                              onChange={e=>setEditC(p=>({...p,[h.id]:e.target.value}))}/>
+                            <button onClick={()=>{upd({homework:homework.map(x=>x.id===h.id?{...x,comment:editC[h.id]??h.comment}:x)});setEditC(p=>({...p,[h.id]:undefined}));}}
+                              className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </Card>
-                ))
-              }
+                    {isOwner&&<button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                  </div>
+                </Card>
+              ))}
             </div>
-            {isOwner && (
+            {isOwner&&(
               <Card>
                 <ST>Добавить задание</ST>
                 <div className="space-y-2">
@@ -631,7 +622,7 @@ export default function App() {
                   <Sel cls="w-full" value={hwF.lessonId} onChange={e=>setHwF(p=>({...p,lessonId:e.target.value}))}>
                     <option value="">Привязать к уроку (необязательно)</option>
                     {hwDueLessons.filter(l=>!hwF.subjectId||l.subjectId===hwF.subjectId).map(l=>{
-                      const s=subj(l.subjectId), dn=DAYS_FULL[DAYS.indexOf(DAYS[Math.min((sd(hwF.due).getDay()+6)%7,5)])];
+                      const s=subj(l.subjectId),dn=DAYS_FULL[DAYS.indexOf(DAYS[Math.min((sd(hwF.due).getDay()+6)%7,5)])];
                       return <option key={l.id} value={l.id}>{[dn,l.lessonNum&&`${l.lessonNum} урок`,l.time].filter(Boolean).join(", ")} — {s?.name}</option>;
                     })}
                   </Sel>
@@ -651,117 +642,176 @@ export default function App() {
           </div>
         )}
 
-        {/* ── TAB 2: ОЦЕНКИ ── */}
-        {tab===2 && (
+        {/* TAB 2: ОЦЕНКИ */}
+        {tab===2&&(
           <div>
-            {isOwner && <p className="text-xs text-slate-400 mb-3 text-center">Нажмите на оценку для изменения</p>}
+            {isOwner&&<p className="text-xs text-slate-400 mb-3 text-center">Нажмите на оценку для изменения · Нажмите на предмет для статистики</p>}
             <div className="space-y-3 mb-4">
               {schSubjs.some(s=>sjGrades(s.id).length>0)
-                ? schSubjs.filter(s=>sjGrades(s.id).length>0).map(s => {
-                    const gs=sjGrades(s.id), av=avgGrade(s.id);
-                    return (
-                      <Card key={s.id} cls="cursor-pointer hover:shadow-md transition-all" onClick={()=>{ setSelectedSubj(s.id); setTab(3); }}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
-                          {av && <span className={`px-2 py-1 rounded-lg text-sm font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср: {av}</span>}
-                        </div>
-                        <div className="flex flex-wrap gap-2">{gs.map((g,i)=><GChip key={i} g={g}/>)}</div>
-                      </Card>
-                    );
-                  })
-                : <Empty txt="Оценок ещё нет"/>
+                ?schSubjs.filter(s=>sjGrades(s.id).length>0).map(s=>{
+                  const gs=sjGrades(s.id),av=avgGrade(s.id);
+                  return(
+                    <Card key={s.id} cls="cursor-pointer hover:shadow-md transition-all border border-slate-200" onClick={()=>{setSelSubj(s.id);setTab(3);}}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
+                        {av&&<span className={`px-2 py-1 rounded-lg text-sm font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср: {av}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-2">{gs.map((g,i)=><GChip key={i} g={g}/>)}</div>
+                    </Card>
+                  );
+                })
+                :<Empty txt="Оценок ещё нет"/>
               }
             </div>
-            {isOwner && (
+            {isOwner&&(
               <Card>
                 <ST>Добавить оценку</ST>
                 {schSubjs.length===0
-                  ? <p className="text-xs text-slate-400 text-center py-2">Сначала добавьте предметы в расписание</p>
-                  : <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Sel cls="flex-1" value={grF.subjectId} onChange={e=>setGrF(p=>({...p,subjectId:e.target.value}))}>
-                          <option value="">Предмет...</option>
-                          {schSubjs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                        </Sel>
-                        <Sel cls="w-28" value={grF.type} onChange={e=>setGrF(p=>({...p,type:e.target.value}))}>
-                          <option value="class">Устный</option><option value="test">Контр.</option>
-                        </Sel>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <GPicker value={grF.value} onChange={v=>setGrF(p=>({...p,value:v||"5"}))}/>
-                        <Inp type="date" cls="flex-1" value={grF.date} onChange={e=>setGrF(p=>({...p,date:e.target.value}))}/>
-                        <Btn onClick={()=>{
-                          if (!grF.subjectId||!grF.value) return;
-                          upd({grades:[...grades,{id:uid(),childId:cid,...grF,hwId:null}]});
-                          setGrF(p=>({...p,subjectId:"",value:"5",date:toDay()}));
-                        }} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
-                      </div>
+                  ?<p className="text-xs text-slate-400 text-center py-2">Сначала добавьте предметы в расписание</p>
+                  :<div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Sel cls="flex-1" value={grF.subjectId} onChange={e=>setGrF(p=>({...p,subjectId:e.target.value}))}>
+                        <option value="">Предмет...</option>
+                        {schSubjs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                      </Sel>
+                      <Sel cls="w-32" value={grF.type} onChange={e=>setGrF(p=>({...p,type:e.target.value}))}>
+                        <option value="class">Устно</option>
+                        <option value="test">КР</option>
+                        <option value="hw">Письменно</option>
+                      </Sel>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <GPicker value={grF.value} onChange={v=>setGrF(p=>({...p,value:v||"5"}))}/>
+                      <Inp type="date" cls="flex-1" value={grF.date} onChange={e=>setGrF(p=>({...p,date:e.target.value}))}/>
+                      <Btn onClick={()=>{
+                        if (!grF.subjectId||!grF.value) return;
+                        upd({grades:[...grades,{id:uid(),childId:cid,...grF,hwId:null}]});
+                        setGrF(p=>({...p,subjectId:"",value:"5",date:toDay()}));
+                      }} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
+                    </div>
+                  </div>
                 }
               </Card>
             )}
           </div>
         )}
 
-        {/* ── TAB 3: СТАТИСТИКА ── */}
-        {tab===3 && (() => {
-          // Если выбран конкретный предмет — показываем только его
-          if (selectedSubj) {
-            const s = subj(selectedSubj);
-            if (!s) return null;
-            const gs = sjGrades(selectedSubj);
-            const av = avgGrade(selectedSubj);
-            const hw = chHw.filter(h => h.subjectId === selectedSubj);
-            const bc = a => { const n = Math.round(a||0); if(n>=5) return "#1D9E75"; if(n>=4) return "#378ADD"; if(n>=3) return "#EF9F27"; return "#E24B4A"; };
-            const wDone = hw.filter(h=>h.done).length;
+        {/* TAB 3: СТАТИСТИКА */}
+        {tab===3&&(()=>{
+          // Вспомогательные функции
+          const DEF_ORDER = ["hero","best","last","subjs","hw"];
+          const SEC_TITLES = {subjs:"Успеваемость по предметам",hw:"Домашние задания",last:"Последние оценки"};
+          const orderKey = "sOrd_"+cid, collKey = "sColl_"+cid;
+
+          const getOrd = () => { const s=statsPrefs[orderKey]; return Array.isArray(s)?s:DEF_ORDER; };
+          const getCol = () => { const s=statsPrefs[collKey]; return Array.isArray(s)?new Set(s):new Set(["subjs","hw"]); };
+
+          // Используем состояние из верхнего уровня (нет useState внутри!)
+          const sOrder = (sOrdState?.cid===cid ? sOrdState.order : null) || getOrd();
+          const sColl  = (sCollState?.cid===cid ? sCollState.coll  : null) || getCol();
+
+          const setOrd = arr => { setSOrdState({cid,order:arr}); saveStatsPrefs({...statsPrefs,[orderKey]:arr}); };
+          const setCol = set => { setSCollState({cid,coll:new Set(set)}); saveStatsPrefs({...statsPrefs,[collKey]:[...set]}); };
+
+          const toggleColl = id => { const n=new Set(sColl); n.has(id)?n.delete(id):n.add(id); setCol(n); };
+          const moveSection = (id,dir) => {
+            const arr=[...sOrder], i=arr.indexOf(id), j=i+dir;
+            if (j<0||j>=arr.length) return;
+            [arr[i],arr[j]]=[arr[j],arr[i]]; setOrd(arr);
+          };
+
+          // Функция рендера сворачиваемой секции (НЕ компонент!)
+          const renderSec = (id, content) => {
+            const title = SEC_TITLES[id];
+            if (!content) return null;
+            if (!title) return <div key={id}>{content}</div>;
+            const collapsed = sColl.has(id);
+            const movable = sOrder.filter(x=>SEC_TITLES[x]);
+            const midx = movable.indexOf(id);
             return (
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <button onClick={()=>setSelectedSubj(null)} className="text-slate-400 hover:text-slate-600 text-sm flex items-center gap-1">← Все предметы</button>
-                </div>
-                {/* Карточка предмета */}
-                <div style={{background: av ? bc(parseFloat(av)) : "#64748b", borderRadius:"18px", padding:"20px", marginBottom:"14px"}}>
-                  <p style={{fontSize:"13px", color:"rgba(255,255,255,0.75)", margin:"0 0 4px"}}>{s.name}</p>
-                  <p style={{fontSize:"42px", fontWeight:"500", color:"#fff", margin:"0", lineHeight:"1"}}>{av || "—"}</p>
-                  <p style={{fontSize:"12px", color:"rgba(255,255,255,0.65)", margin:"6px 0 0"}}>средний балл</p>
-                  <div style={{display:"flex", gap:"20px", marginTop:"16px", paddingTop:"14px", borderTop:"1px solid rgba(255,255,255,0.2)"}}>
-                    <div><div style={{fontSize:"18px", fontWeight:"500", color:"#fff"}}>{gs.length}</div><div style={{fontSize:"11px", color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
-                    <div><div style={{fontSize:"18px", fontWeight:"500", color:"#fff"}}>{hw.length}</div><div style={{fontSize:"11px", color:"rgba(255,255,255,0.55)"}}>заданий</div></div>
-                    <div><div style={{fontSize:"18px", fontWeight:"500", color:"#fff"}}>{hw.length > 0 ? Math.round(wDone/hw.length*100)+"%" : "—"}</div><div style={{fontSize:"11px", color:"rgba(255,255,255,0.55)"}}>выполнено</div></div>
+              <div key={id} style={{marginBottom:"12px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                  <button onClick={()=>toggleColl(id)}
+                    style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between",background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:collapsed?"14px":"14px 14px 0 0",padding:"10px 14px",cursor:"pointer",textAlign:"left"}}>
+                    <span style={{fontSize:"13px",fontWeight:"500",color:"#1e293b"}}>{title}</span>
+                    <span style={{fontSize:"14px",color:"#94a3b8",display:"inline-block",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",transition:"transform 0.15s"}}>⌄</span>
+                  </button>
+                  <div style={{display:"flex",flexDirection:"column",gap:"2px"}}>
+                    <button onClick={()=>moveSection(id,-1)} style={{width:"24px",height:"22px",border:"0.5px solid #e2e8f0",borderRadius:"6px",background:"#fff",cursor:"pointer",fontSize:"12px",color:"#94a3b8",opacity:midx===0?"0.3":"1"}}>↑</button>
+                    <button onClick={()=>moveSection(id,+1)} style={{width:"24px",height:"22px",border:"0.5px solid #e2e8f0",borderRadius:"6px",background:"#fff",cursor:"pointer",fontSize:"12px",color:"#94a3b8",opacity:midx===movable.length-1?"0.3":"1"}}>↓</button>
                   </div>
                 </div>
-                {/* Оценки */}
-                {gs.length > 0 ? (
-                  <div style={{background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:"14px", padding:"14px", marginBottom:"14px"}}>
-                    <p style={{fontSize:"13px", fontWeight:"500", margin:"0 0 12px"}}>Оценки</p>
-                    <div className="flex flex-wrap gap-2">
-                      {gs.map((g,i) => (
-                        <div key={i} className={["flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-xs", GC[g.value]||"bg-slate-100"].join(" ")}>
-                          <span className="font-bold text-base">{g.value}</span>
-                          <span className="opacity-60">{g.type==="hw"?"дз":g.type==="test"?"к/р":"уст"}</span>
-                          {g.date && <span className="opacity-50">{g.date.slice(5)}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:"14px", padding:"14px", marginBottom:"14px"}}>
-                    <p className="text-sm text-slate-400 text-center py-2">Оценок пока нет</p>
+                {!collapsed&&(
+                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderTop:"none",borderRadius:"0 0 14px 14px",padding:"14px"}}>
+                    {content}
                   </div>
                 )}
-                {/* Домашние задания */}
-                {hw.length > 0 && (
-                  <div style={{background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:"14px", padding:"14px"}}>
-                    <p style={{fontSize:"13px", fontWeight:"500", margin:"0 0 12px"}}>Домашние задания</p>
+              </div>
+            );
+          };
+
+          // ── Экран конкретного предмета ──
+          if (selSubj) {
+            const s=subj(selSubj); if (!s) return null;
+            const gs=sjGrades(selSubj), av=avgGrade(selSubj);
+            const hw=chHw.filter(h=>h.subjectId===selSubj);
+            const wDone=hw.filter(h=>h.done).length;
+            const sorted=[...gs].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+            const vals=sorted.map(g=>+g.value).filter(Boolean);
+            const avg2=vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):null;
+            const half=Math.ceil(vals.length/2);
+            const fA=vals.slice(0,half).reduce((a,b)=>a+b,0)/Math.max(half,1);
+            const sA=vals.length>1?vals.slice(half).reduce((a,b)=>a+b,0)/Math.max(vals.length-half,1):fA;
+            const trend=vals.length>=2?(sA>fA+0.2?"↑":sA<fA-0.2?"↓":"→"):null;
+            const trendColor=trend==="↑"?"#1D9E75":trend==="↓"?"#E24B4A":"#94a3b8";
+            const color=av?bc(parseFloat(av)):"#64748b";
+            return (
+              <div>
+                <button onClick={()=>setSelSubj(null)} className="text-slate-400 hover:text-slate-600 text-sm flex items-center gap-1 mb-4">← Все предметы</button>
+                <div style={{background:color,borderRadius:"18px",padding:"20px",marginBottom:"14px"}}>
+                  <p style={{fontSize:"13px",color:"rgba(255,255,255,0.75)",margin:"0 0 4px"}}>{s.name}</p>
+                  <p style={{fontSize:"42px",fontWeight:"500",color:"#fff",margin:"0",lineHeight:"1"}}>{av||"—"}</p>
+                  <p style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",margin:"6px 0 0"}}>средний балл</p>
+                  <div style={{display:"flex",gap:"20px",marginTop:"16px",paddingTop:"14px",borderTop:"1px solid rgba(255,255,255,0.2)"}}>
+                    <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{gs.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
+                    <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{hw.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>заданий</div></div>
+                    <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{hw.length>0?Math.round(wDone/hw.length*100)+"%":"—"}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>выполнено</div></div>
+                  </div>
+                </div>
+                {sorted.length>0&&(
+                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+                      <p style={{fontSize:"13px",fontWeight:"500",margin:"0"}}>Оценки</p>
+                      {avg2&&<div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                        <span style={{fontSize:"11px",color:"#94a3b8"}}>среднее</span>
+                        <span style={{fontSize:"13px",fontWeight:"500",color:(GC2[String(Math.round(parseFloat(avg2)))]||{tc:"#64748b"}).tc}}>{avg2}</span>
+                        {trend&&<span style={{fontSize:"13px",color:trendColor}}>{trend}</span>}
+                      </div>}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
+                      {sorted.map((g,i)=>{const cl=gcl(g.value);return(
+                        <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1px",padding:"4px 7px",borderRadius:"7px",background:cl.bg,border:isKR(g.type)?"2px solid "+cl.tc:"2px solid transparent"}}>
+                          <span style={{fontSize:"9px",lineHeight:"1",marginBottom:"1px"}}>{gradeIcon(g.type)}</span>
+                          <span style={{fontSize:"15px",fontWeight:"500",color:cl.tc,lineHeight:"1"}}>{g.value}</span>
+                          {g.date&&<span style={{fontSize:"9px",color:cl.tc,opacity:0.6}}>{fmtDate(g.date)}</span>}
+                        </div>
+                      );})}
+                    </div>
+                  </div>
+                )}
+                {gs.length===0&&<div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}><p className="text-sm text-slate-400 text-center py-2">Оценок пока нет</p></div>}
+                {hw.length>0&&(
+                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px"}}>
+                    <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 12px"}}>Домашние задания</p>
                     <div className="space-y-2">
-                      {hw.map(h => (
-                        <div key={h.id} className={["flex items-start gap-2 p-2.5 rounded-xl bg-slate-50", h.done?"opacity-60":""].join(" ")}>
-                          <span className={["mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs", h.done?"bg-green-500 border-green-500 text-white":"border-slate-300"].join(" ")}>{h.done&&"✓"}</span>
+                      {hw.map(h=>(
+                        <div key={h.id} className={["flex items-start gap-2 p-2.5 rounded-xl bg-slate-50",h.done?"opacity-60":""].join(" ")}>
+                          <span className={["mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs",h.done?"bg-green-500 border-green-500 text-white":"border-slate-300"].join(" ")}>{h.done&&"✓"}</span>
                           <div className="flex-1 min-w-0">
-                            <p className={["text-xs text-slate-700", h.done?"line-through":""].join(" ")}>{h.task}</p>
-                            {h.date && <p className="text-xs text-slate-400 mt-0.5">до {h.date}</p>}
+                            <p className={["text-xs text-slate-700",h.done?"line-through":""].join(" ")}>{h.task}</p>
+                            {h.date&&<p className="text-xs text-slate-400 mt-0.5">до {fmtDate(h.date)}</p>}
                           </div>
-                          {h.grade && <span className={[GC[h.grade]||"","px-1.5 py-0.5 rounded-lg text-xs font-bold"].join(" ")}>{h.grade}</span>}
+                          {h.grade&&<span className={[GC[h.grade]||"","px-1.5 py-0.5 rounded-lg text-xs font-bold"].join(" ")}>{h.grade}</span>}
                         </div>
                       ))}
                     </div>
@@ -771,156 +821,58 @@ export default function App() {
             );
           }
 
-          const ss = schSubjs.map(s => {
-            const gs=sjGrades(s.id), v=gs.map(g=>+g.value).filter(Boolean);
+          // ── Общая статистика ──
+          const ss=schSubjs.map(s=>{
+            const gs=sjGrades(s.id),v=gs.map(g=>+g.value).filter(Boolean);
             const a=v.length?(v.reduce((x,y)=>x+y,0)/v.length):null;
-            const r=v.slice(0,3), o=v.slice(3,6);
+            const r=v.slice(0,3),o=v.slice(3,6);
             const rA=r.length?r.reduce((x,y)=>x+y,0)/r.length:null;
             const oA=o.length?o.reduce((x,y)=>x+y,0)/o.length:null;
-            return {s, a, n:v.length, t:rA&&oA?(rA>oA?"↑":rA<oA?"↓":"→"):"→"};
+            return {s,a,n:v.length,t:rA&&oA?(rA>oA?"↑":rA<oA?"↓":"→"):"→"};
           }).filter(x=>x.n>0).sort((a,b)=>(b.a||0)-(a.a||0));
 
-          const wS=ds(getMonday(new Date())), wE=ds(wDates[5]);
-          const wH=chHw.filter(h=>h.date>=wS&&h.date<=wE);
-          const wD=wH.filter(h=>h.done).length, wT=wH.length, wp=wT?Math.round(wD/wT*100):0;
-          const aD=chHw.filter(h=>h.done).length, aT=chHw.length, ap=aT?Math.round(aD/aT*100):0;
-          const best=ss[0], worst=ss[ss.length-1];
-          const oa=ss.length?(ss.reduce((a,x)=>a+(x.a||0),0)/ss.length).toFixed(1):null;
-          const tg=ss.reduce((a,x)=>a+x.n,0);
-          const lg=schSubjs.flatMap(s=>sjGrades(s.id).map(g=>({...g,sn:s.name}))).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
-          const gc=v=>{const n=+v;if(n>=5)return{bg:"#EAF3DE",tc:"#3B6D11"};if(n>=4)return{bg:"#E6F1FB",tc:"#185FA5"};if(n>=3)return{bg:"#FAEEDA",tc:"#854F0B"};return{bg:"#FCEBEB",tc:"#A32D2D"};};
-          const bc=a=>{const n=Math.round(a||0);if(n>=5)return"#1D9E75";if(n>=4)return"#378ADD";if(n>=3)return"#EF9F27";return"#E24B4A";};
-
           if (!ss.length) return <Empty txt="Оценок пока нет — статистика появится после первых отметок"/>;
-          return (
-            <div>
-              {/* Синяя hero-карточка */}
-              <div style={{background:"#185FA5",borderRadius:"18px",padding:"20px",marginBottom:"14px"}}>
+
+          const wS=ds(getMonday(new Date())),wE=ds(wDates[5]);
+          const wH=chHw.filter(h=>h.date>=wS&&h.date<=wE);
+          const wD=wH.filter(h=>h.done).length,wT=wH.length,wp=wT?Math.round(wD/wT*100):0;
+          const aD=chHw.filter(h=>h.done).length,aT=chHw.length,ap=aT?Math.round(aD/aT*100):0;
+          const best=ss[0],worst=ss[ss.length-1];
+          const oa=(ss.reduce((a,x)=>a+(x.a||0),0)/ss.length).toFixed(1);
+          const tg=ss.reduce((a,x)=>a+x.n,0);
+          const lg=schSubjs.flatMap(s=>sjGrades(s.id).map(g=>({...g,sn:s.name}))).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,12);
+
+          const SECTIONS = {
+            hero:(
+              <div style={{background:"#185FA5",borderRadius:"18px",padding:"20px",marginBottom:"12px"}}>
                 <p style={{fontSize:"11px",color:"rgba(255,255,255,0.6)",margin:"0 0 4px",letterSpacing:"0.5px"}}>СРЕДНИЙ БАЛЛ</p>
                 <p style={{fontSize:"42px",fontWeight:"500",color:"#fff",margin:"0",lineHeight:"1"}}>{oa||"—"}</p>
                 <p style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",margin:"6px 0 0"}}>по всем предметам</p>
-                <div style={{display:"flex",gap:"20px",marginTop:"18px",paddingTop:"16px",borderTop:"1px solid rgba(255,255,255,0.15)"}}>
+                <div style={{display:"flex",gap:"20px",marginTop:"16px",paddingTop:"14px",borderTop:"1px solid rgba(255,255,255,0.15)"}}>
                   <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{tg}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
                   <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{ap}%</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>ДЗ выполнено</div></div>
                   <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{ss.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>предметов</div></div>
                 </div>
               </div>
-              {/* Лучший / подтянуть */}
-              {ss.length>1 && (
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"14px"}}>
-                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderLeft:"3px solid #1D9E75",borderRadius:"14px",padding:"14px"}}>
-                    <p style={{fontSize:"11px",color:"#94a3b8",margin:"0 0 5px"}}>Лучший предмет</p>
-                    <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{best.s.name}</p>
-                    <p style={{fontSize:"26px",fontWeight:"500",color:"#1D9E75",margin:"0"}}>{best.a?.toFixed(1)}</p>
-                  </div>
-                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderLeft:"3px solid #E24B4A",borderRadius:"14px",padding:"14px"}}>
-                    <p style={{fontSize:"11px",color:"#94a3b8",margin:"0 0 5px"}}>Подтянуть</p>
-                    <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{worst.s.name}</p>
-                    <p style={{fontSize:"26px",fontWeight:"500",color:"#E24B4A",margin:"0"}}>{worst.a?.toFixed(1)}</p>
-                  </div>
+            ),
+            best: ss.length>1?(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"12px"}}>
+                <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderLeft:"3px solid #1D9E75",borderRadius:"14px",padding:"14px"}}>
+                  <p style={{fontSize:"11px",color:"#94a3b8",margin:"0 0 5px"}}>Лучший предмет</p>
+                  <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{best.s.name}</p>
+                  <p style={{fontSize:"26px",fontWeight:"500",color:"#1D9E75",margin:"0"}}>{best.a?.toFixed(1)}</p>
                 </div>
-              )}
-              {/* Предметы */}
-              
-              {/* График динамики оценок */}
-              {(() => {
-                const COLORS = ["#378ADD","#1D9E75","#EF9F27","#D4537E","#8B5CF6","#F97316","#06B6D4","#84CC16"];
-                const subjColors = {};
-                schSubjs.forEach((s, i) => { subjColors[s.id] = COLORS[i % COLORS.length]; });
-
-                const allGrades = schSubjs.flatMap(s =>
-                  sjGrades(s.id).filter(g => g.date && g.value).map(g => ({ ...g, sn: s.name, sid: s.id }))
-                ).sort((a, b) => a.date.localeCompare(b.date));
-
-                if (allGrades.length < 2) return null;
-
-                const filtSid = selectedSubj;
-                const visGrades = filtSid ? allGrades.filter(g => g.sid === filtSid) : allGrades;
-                if (visGrades.length < 1) return null;
-
-                const W = 560, H = 160, PL = 24, PR = 8, PT = 10, PB = 24;
-                const IW = W - PL - PR, IH = H - PT - PB;
-
-                const dates = [...new Set(visGrades.map(g => g.date))].sort();
-                const xPos = d => PL + (dates.length < 2 ? IW / 2 : (dates.indexOf(d) / (dates.length - 1)) * IW);
-                const yPos = v => PT + IH - ((+v - 2) / 3) * IH;
-
-                const bySid = {};
-                visGrades.forEach(g => {
-                  if (!bySid[g.sid]) bySid[g.sid] = [];
-                  bySid[g.sid].push(g);
-                });
-
-                const xLabels = dates.length <= 7 ? dates : dates.filter((_, i) => i % Math.ceil(dates.length / 7) === 0 || i === dates.length - 1);
-
-                return (
-                  <div style={{ background: "#fff", border: "0.5px solid #e2e8f0", borderRadius: "14px", padding: "14px", marginBottom: "14px" }}>
-                    <p style={{ fontSize: "13px", fontWeight: "500", margin: "0 0 10px" }}>Динамика оценок</p>
-
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
-                      <button onClick={() => setSelectedSubj(null)}
-                        style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "99px", border: "0.5px solid #cbd5e1", background: !filtSid ? "#1e293b" : "transparent", color: !filtSid ? "#fff" : "#64748b", cursor: "pointer" }}>
-                        Все
-                      </button>
-                      {schSubjs.map(s => (
-                        <button key={s.id} onClick={() => setSelectedSubj(filtSid === s.id ? null : s.id)}
-                          style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "99px", border: "0.5px solid #cbd5e1", background: filtSid === s.id ? subjColors[s.id] : "transparent", color: filtSid === s.id ? "#fff" : "#64748b", cursor: "pointer" }}>
-                          {s.name.split(" ")[0]}
-                        </button>
-                      ))}
-                    </div>
-
-                    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-                      {[2,3,4,5].map(v => (
-                        <g key={v}>
-                          <line x1={PL} x2={W-PR} y1={yPos(v)} y2={yPos(v)} stroke="#f1f5f9" strokeWidth="1"/>
-                          <text x={PL-4} y={yPos(v)+4} textAnchor="end" fontSize="10" fill="#94a3b8">{v}</text>
-                        </g>
-                      ))}
-
-                      {xLabels.map(d => (
-                        <text key={d} x={xPos(d)} y={H-6} textAnchor="middle" fontSize="10" fill="#94a3b8">{d.slice(5)}</text>
-                      ))}
-
-                      {Object.entries(bySid).map(([sid, gs]) => {
-                        const color = subjColors[sid];
-                        const pts = gs.map(g => ({ x: xPos(g.date), y: yPos(g.value) }));
-                        return (
-                          <g key={sid}>
-                            {pts.length >= 2 && (
-                              <polyline
-                                points={pts.map(p => `${p.x},${p.y}`).join(" ")}
-                                fill="none" stroke={color} strokeWidth="2.5"
-                                strokeLinecap="round" strokeLinejoin="round"
-                              />
-                            )}
-                            {pts.map((p, i) => (
-                              <g key={i}>
-                                <circle cx={p.x} cy={p.y} r="5" fill={color}/>
-                                <circle cx={p.x} cy={p.y} r="2.5" fill="#fff"/>
-                              </g>
-                            ))}
-                          </g>
-                        );
-                      })}
-                    </svg>
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "8px" }}>
-                      {schSubjs.filter(s => !filtSid || s.id === filtSid).map(s => (
-                        <span key={s.id} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#64748b" }}>
-                          <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: subjColors[s.id], display: "inline-block" }}/>
-                          {s.name.split(" ")[0]}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}>
-                <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 12px"}}>Успеваемость по предметам</p>
+                <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderLeft:"3px solid #E24B4A",borderRadius:"14px",padding:"14px"}}>
+                  <p style={{fontSize:"11px",color:"#94a3b8",margin:"0 0 5px"}}>Подтянуть</p>
+                  <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{worst.s.name}</p>
+                  <p style={{fontSize:"26px",fontWeight:"500",color:"#E24B4A",margin:"0"}}>{worst.a?.toFixed(1)}</p>
+                </div>
+              </div>
+            ):null,
+            subjs:(
+              <div>
                 {ss.map(({s,a,t})=>(
-                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px"}}>
+                  <div key={s.id} onClick={()=>setSelSubj(s.id)} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px",cursor:"pointer",padding:"4px",borderRadius:"8px"}}>
                     <span style={{fontSize:"12px",flex:"1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
                     <span style={{fontSize:"12px",color:bc(a),width:"14px",textAlign:"center"}}>{t}</span>
                     <div style={{flex:"1",maxWidth:"90px",background:"#f1f5f9",borderRadius:"99px",height:"5px"}}>
@@ -930,10 +882,10 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              {/* ДЗ */}
-              <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}>
-                <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 12px"}}>Домашние задания</p>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"14px"}}>
+            ),
+            hw:(
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
                   <div style={{background:"#f8fafc",borderRadius:"10px",padding:"10px",textAlign:"center"}}>
                     <div style={{fontSize:"22px",fontWeight:"500"}}>{wT>0?wp+"%":"—"}</div>
                     <div style={{fontSize:"11px",color:"#94a3b8"}}>эта неделя</div>
@@ -947,56 +899,60 @@ export default function App() {
                 </div>
                 {wT>0&&<div style={{background:"#f1f5f9",borderRadius:"99px",height:"7px"}}><div style={{height:"7px",borderRadius:"99px",background:"#1D9E75",width:wp+"%"}}/></div>}
               </div>
-              {/* Последние оценки */}
-              {lg.length>0&&(
-                <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px"}}>
-                  <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 12px"}}>Последние оценки</p>
-                  <div style={{display:"flex",gap:"7px",flexWrap:"wrap"}}>
-                    {lg.map((g,i)=>{const{bg,tc}=gc(g.value);return(
-                      <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
-                        <div style={{width:"34px",height:"34px",borderRadius:"9px",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"15px",fontWeight:"500",color:tc}}>{g.value}</div>
-                        <div style={{fontSize:"10px",color:"#94a3b8"}}>{g.sn?.split(" ")[0]?.slice(0,4)}</div>
-                      </div>
-                    );})}
+            ),
+            last: lg.length>0?(
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {lg.map((g,i)=>{const cl=gcl(g.value);return(
+                  <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
+                    <div style={{width:"36px",height:"36px",borderRadius:"10px",background:cl.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",border:isKR(g.type)?"2px solid "+cl.tc:"2px solid transparent",boxSizing:"border-box"}}>
+                      <span style={{fontSize:"9px",lineHeight:"1"}}>{gradeIcon(g.type)}</span>
+                      <span style={{fontSize:"14px",fontWeight:"500",color:cl.tc,lineHeight:"1.1"}}>{g.value}</span>
+                    </div>
+                    <div style={{fontSize:"10px",color:"#94a3b8"}}>{g.sn?.split(" ")[0]?.slice(0,4)}</div>
                   </div>
-                </div>
-              )}
+                );})}
+              </div>
+            ):null,
+          };
+
+          return (
+            <div>
+              {sOrder.map(id => renderSec(id, SECTIONS[id]))}
             </div>
           );
         })()}
 
-        {/* ── TAB 4: КРУЖКИ ── */}
-        {tab===4 && (
+        {/* TAB 4: КРУЖКИ */}
+        {tab===4&&(
           <div>
             <div className="space-y-3 mb-4">
-              {chCl.length===0 ? <Empty txt="Кружки не добавлены"/>
-                : chCl.map(c => (
-                  <Card key={c.id} cls={c.done?"opacity-70":""}>
-                    <div className="flex items-center gap-3">
-                      <button onClick={()=>upd({clubs:clubs.map(x=>x.id===c.id?{...x,done:!x.done}:x)})}
-                        className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${c.done?"bg-green-500 border-green-500 text-white":"border-slate-300"}`}>{c.done&&"✓"}</button>
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium text-slate-700 ${c.done?"line-through":""}`}>{c.name}</p>
-                        <p className="text-xs text-slate-400">{DAYS_FULL[DAYS.indexOf(c.day)]}{c.time?`, ${c.time}`:""}</p>
-                        {c.comment && <div className="mt-1 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1"><p className="text-xs text-amber-800">💬 {c.comment}</p></div>}
-                        {isOwner && (
-                          <div className="flex gap-2 mt-2 items-end">
-                            <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
-                              placeholder="Комментарий..." rows={2}
-                              value={editC["c_"+c.id]??c.comment}
-                              onChange={e=>setEditC(p=>({...p,["c_"+c.id]:e.target.value}))}/>
-                            <button onClick={()=>{upd({clubs:clubs.map(x=>x.id===c.id?{...x,comment:editC["c_"+c.id]??c.comment}:x)});setEditC(p=>({...p,["c_"+c.id]:undefined}));}}
-                              className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
-                          </div>
-                        )}
-                      </div>
-                      {isOwner && <button onClick={()=>upd({clubs:clubs.filter(x=>x.id!==c.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+              {chCl.length===0?<Empty txt="Кружки не добавлены"/>
+                :chCl.map(c=>(
+                <Card key={c.id} cls={c.done?"opacity-70":""}>
+                  <div className="flex items-center gap-3">
+                    <button onClick={()=>upd({clubs:clubs.map(x=>x.id===c.id?{...x,done:!x.done}:x)})}
+                      className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${c.done?"bg-green-500 border-green-500 text-white":"border-slate-300"}`}>{c.done&&"✓"}</button>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium text-slate-700 ${c.done?"line-through":""}`}>{c.name}</p>
+                      <p className="text-xs text-slate-400">{DAYS_FULL[DAYS.indexOf(c.day)]}{c.time?`, ${c.time}`:""}</p>
+                      {c.comment&&<div className="mt-1 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1"><p className="text-xs text-amber-800">💬 {c.comment}</p></div>}
+                      {isOwner&&(
+                        <div className="flex gap-2 mt-2 items-end">
+                          <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                            placeholder="Комментарий..." rows={2}
+                            value={editC["c_"+c.id]??c.comment}
+                            onChange={e=>setEditC(p=>({...p,["c_"+c.id]:e.target.value}))}/>
+                          <button onClick={()=>{upd({clubs:clubs.map(x=>x.id===c.id?{...x,comment:editC["c_"+c.id]??c.comment}:x)});setEditC(p=>({...p,["c_"+c.id]:undefined}));}}
+                            className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
+                        </div>
+                      )}
                     </div>
-                  </Card>
-                ))
-              }
+                    {isOwner&&<button onClick={()=>upd({clubs:clubs.filter(x=>x.id!==c.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                  </div>
+                </Card>
+              ))}
             </div>
-            {isOwner && (
+            {isOwner&&(
               <Card>
                 <ST>Добавить кружок</ST>
                 <div className="space-y-2">
@@ -1018,26 +974,26 @@ export default function App() {
           </div>
         )}
 
-        {/* ── TAB 5: ПРЕДМЕТЫ (owner) ── */}
-        {tab===5 && isOwner && (
+        {/* TAB 5: ПРЕДМЕТЫ (owner) */}
+        {tab===5&&isOwner&&(
           <div>
             <Card cls="mb-4">
               <ST>Предметы в расписании {activeCh?.name}</ST>
               {schSubjs.length===0
-                ? <p className="text-slate-400 text-sm text-center py-4">Нет — добавьте уроки в расписание</p>
-                : <div className="space-y-2">
-                    {schSubjs.map(s => {
-                      const av=avgGrade(s.id);
-                      return (
-                        <div key={s.id} onClick={()=>{ setSelectedSubj(s.id); setTab(3); }} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50 cursor-pointer active:bg-slate-100">
-                          <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
-                          <span className="text-xs text-slate-400">{chTpl.filter(l=>l.subjectId===s.id).length} ур/нед</span>
-                          <span className="text-xs text-slate-400">{chHw.filter(h=>h.subjectId===s.id).length} дз</span>
-                          {av && <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср {av}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
+                ?<p className="text-slate-400 text-sm text-center py-4">Нет — добавьте уроки в расписание</p>
+                :<div className="space-y-2">
+                  {schSubjs.map(s=>{
+                    const av=avgGrade(s.id);
+                    return(
+                      <div key={s.id} onClick={()=>{setSelSubj(s.id);setTab(3);}} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50 cursor-pointer active:bg-slate-100">
+                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
+                        <span className="text-xs text-slate-400">{chTpl.filter(l=>l.subjectId===s.id).length} ур/нед</span>
+                        <span className="text-xs text-slate-400">{chHw.filter(h=>h.subjectId===s.id).length} дз</span>
+                        {av&&<span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср {av}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
               }
             </Card>
             <Card>
@@ -1051,10 +1007,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ── TAB 6: СЕМЬЯ (owner) ── */}
-        {tab===6 && isOwner && (
+        {/* TAB 6: СЕМЬЯ (owner) */}
+        {tab===6&&isOwner&&(
           <div>
-            {/* Код семьи */}
             <Card cls="mb-4 bg-amber-50 border border-amber-100">
               <ST>🔑 Код семьи</ST>
               <div className="flex items-center justify-between">
@@ -1065,27 +1020,22 @@ export default function App() {
                 </div>
               </div>
             </Card>
-
-            {/* Список детей */}
             <div className="space-y-3 mb-4">
-              {children.length===0 ? <Empty txt="Детей нет — добавьте первого"/>
-                : children.map(ch => (
-                  <Card key={ch.id}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold`}>{ch.name[0].toUpperCase()}</div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-700">{ch.name}</p>
-                        <p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р.`}{ch.birthYear&&ch.grade?" · ":""}{ch.grade&&`${ch.grade} класс`}</p>
-                        <p className="text-xs text-slate-400">{weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий</p>
-                      </div>
-                      <button onClick={()=>remChild(ch.id)} className="text-slate-300 hover:text-red-400 text-lg">×</button>
+              {children.length===0?<Empty txt="Детей нет — добавьте первого"/>
+                :children.map(ch=>(
+                <Card key={ch.id}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold`}>{ch.name[0].toUpperCase()}</div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-700">{ch.name}</p>
+                      <p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р.`}{ch.birthYear&&ch.grade?" · ":""}{ch.grade&&`${ch.grade} класс`}</p>
+                      <p className="text-xs text-slate-400">{weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий</p>
                     </div>
-                  </Card>
-                ))
-              }
+                    <button onClick={()=>remChild(ch.id)} className="text-slate-300 hover:text-red-400 text-lg">×</button>
+                  </div>
+                </Card>
+              ))}
             </div>
-
-            {/* Добавить ребёнка */}
             <Card cls="mb-4">
               <ST>Добавить ребёнка</ST>
               <div className="space-y-2">
@@ -1100,14 +1050,12 @@ export default function App() {
                     <Inp cls="w-full" placeholder="2017" type="number" value={newChild.schoolYear} onChange={e=>setNewChild(p=>({...p,schoolYear:e.target.value}))}/>
                   </div>
                 </div>
-                {newChild.schoolYear && parseInt(newChild.schoolYear)<=new Date().getFullYear() && (
+                {newChild.schoolYear&&parseInt(newChild.schoolYear)<=new Date().getFullYear()&&(
                   <p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎒 Текущий класс: <b>{new Date().getFullYear()-parseInt(newChild.schoolYear)+1}</b></p>
                 )}
                 <Btn onClick={addChild} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
               </div>
             </Card>
-
-            {/* Опасная зона */}
             <Card cls="border border-red-100">
               <ST>⚠️ Опасная зона</ST>
               <p className="text-xs text-slate-400 mb-3">Удаление семьи сотрёт все данные безвозвратно.</p>
@@ -1120,7 +1068,6 @@ export default function App() {
         )}
 
       </div>
-
     </div>
   );
 }
