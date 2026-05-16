@@ -198,10 +198,11 @@ export default function ScheduleTab({
                     const hasKR=pendHw.some(h=>h.hwType==="kr");
                     const dotColor=(isCancelled||isMovedAway)?'#cbd5e1':DOT_COLORS[((s?.c)||0)%DOT_COLORS.length];
                     const prevLesson=idx>0?sortedLessons[idx-1]:null;
-                    const hasGap=prevLesson&&l.lessonNum&&prevLesson.lessonNum&&(+l.lessonNum-(+prevLesson.lessonNum))>1;
+                    const hasGap=l.lessonNum&&(idx===0?+l.lessonNum>1:prevLesson&&prevLesson.lessonNum&&(+l.lessonNum-(+prevLesson.lessonNum))>1);
                     const hwChips=(homework||[]).filter(h=>h.subjectId===l.subjectId&&h.date===activeDate);
                     const showQuickForm=hwQuickForm?.subjectId===l.subjectId&&hwQuickForm?.date===activeDate;
-                    const gapSize=hasGap?(+l.lessonNum-(+prevLesson.lessonNum)-1):0;
+                    const gapSize=hasGap?(idx===0?+l.lessonNum-1:+l.lessonNum-(+prevLesson.lessonNum)-1):0;
+                    const gapStartNum=idx===0?1:(prevLesson?+prevLesson.lessonNum+1:1);
                     const origLesson=(isReplace||isMove)&&l.cancelsSlot
                       ?chTpl.find(t=>t.day===activeDay&&+t.lessonNum===+l.cancelsSlot)
                       :null;
@@ -219,7 +220,7 @@ export default function ScheduleTab({
                         {hasGap&&(
                           <div className="relative flex items-start mb-4">
                             <div className="w-12 text-right pr-2 pt-2 text-xs text-slate-400 flex-shrink-0">
-                              {lessonTimeFor(+prevLesson.lessonNum+1,shift)}
+                              {lessonTimeFor(gapStartNum,shift)}
                             </div>
                             <div className="flex items-center justify-center w-5 flex-shrink-0 pt-3 z-10">
                               <div className="w-4 h-4 rounded-full border-2 border-dashed border-slate-300 bg-white flex-shrink-0"/>
