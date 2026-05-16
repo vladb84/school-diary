@@ -112,13 +112,13 @@ export default function ScheduleTab({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
+        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);const d=new Date(sd(activeDate));d.setDate(d.getDate()-7);setActiveDate(ds(d));}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
         <div className="text-center">
           <p className="text-sm font-semibold text-slate-700">{wLabel}</p>
           {ds(mon)!==ds(getMonday(new Date()))&&<button onClick={()=>{setMon(getMonday(new Date()));setActiveDate(toDay());}} className="text-xs text-blue-500 hover:underline">← сегодня</button>}
           {isOwner&&chTpl.length===0&&<button onClick={seedSchedule} className="text-xs text-emerald-500 hover:underline">✨ Заполнить пример</button>}
         </div>
-        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
+        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);const d=new Date(sd(activeDate));d.setDate(d.getDate()+7);setActiveDate(ds(d));}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
       </div>
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
         {wDates.map((d,i)=>{
