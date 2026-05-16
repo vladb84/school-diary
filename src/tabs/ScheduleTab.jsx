@@ -280,8 +280,6 @@ export default function ScheduleTab({
                                   {s?.name||"?"}
                                 </span>
                                 <span className="text-xs bg-orange-50 text-orange-500 border border-orange-200 rounded-full px-2 py-0.5">разовый</span>
-                                <button onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}} title="Статистика"
-                                  className="text-slate-400 hover:text-blue-500 text-sm px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">📊</button>
                                 {isOwner&&<button onClick={e=>{e.stopPropagation();upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)});}} className="text-slate-300 hover:text-red-400 text-lg ml-1">×</button>}
                               </div>
                             ):(
@@ -293,8 +291,6 @@ export default function ScheduleTab({
                                 </span>
                                 {hasKR?<span className="text-red-500 text-xs">🚨</span>:pendHw.length>0?<span className="text-orange-400 text-xs">📝</span>:null}
                                 {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
-                                <button onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}} title="Статистика"
-                                  className="text-slate-400 hover:text-blue-500 text-sm px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">📊</button>
                                 {isOwner&&(
                                   <button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");}}
                                     className="text-slate-400 hover:text-blue-500 text-xs px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">
