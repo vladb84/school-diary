@@ -534,8 +534,10 @@ export default function App(){
         newTemplate.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
       });
     });
+    const usedIds=new Set([...newTemplate.map(l=>l.subjectId),...homework.map(h=>h.subjectId),...grades.map(g=>g.subjectId)].filter(Boolean));
+    const cleanedSubjects=newSubjects.filter(s=>usedIds.has(s.id));
     if(childId!==ch.id)setChildId(ch.id);
-    upd({subjects:newSubjects,weeklyTemplate:newTemplate});
+    upd({subjects:cleanedSubjects,weeklyTemplate:newTemplate});
   };
 
   return(
@@ -867,8 +869,10 @@ export default function App(){
                             if(!s){s={id:uid(),name,c:ns.length%SC.length};ns.push(s);}
                             nt.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
                           });});
+                          const usedIds=new Set([...nt.map(l=>l.subjectId),...homework.map(h=>h.subjectId),...grades.map(g=>g.subjectId)].filter(Boolean));
+                          const cleanedSubjects=ns.filter(s=>usedIds.has(s.id));
                           if(childId!==ch.id)setChildId(ch.id);
-                          upd({subjects:ns,weeklyTemplate:nt});
+                          upd({subjects:cleanedSubjects,weeklyTemplate:nt});
                         }} className="mt-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 hover:bg-emerald-100 transition-all">
                           ✨ Заполнить расписание
                         </button>
