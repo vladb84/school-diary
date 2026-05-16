@@ -519,8 +519,9 @@ export default function App(){
 
   const calcGrade=ch=>{if(!ch)return null;const g=Number(ch.grade);if(g>0)return g;const sy=parseInt(ch.schoolYear);return(!isNaN(sy)&&sy>0&&sy<=new Date().getFullYear())?new Date().getFullYear()-sy+1:null;};
   const seedSchedule=()=>{
-    const grade=calcGrade(activeCh);
-    if(!grade){setTab(6);setEditChildId(activeCh?.id||null);setEditChildF({});return;}
+    const ch=activeCh||(children.length===1?children[0]:null);
+    const grade=calcGrade(ch);
+    if(!grade||!ch){setTab(6);if(ch){setEditChildId(ch.id);setEditChildF({});}return;}
     const scheduleByGrade={
       1:[
         {day:"Пн",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир"]},
@@ -608,9 +609,10 @@ export default function App(){
       sNames.forEach((name,i)=>{
         let s=newSubjects.find(x=>x.name===name);
         if(!s){s={id:uid(),name,c:newSubjects.length%SC.length};newSubjects.push(s);}
-        newTemplate.push({id:uid(),childId,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
+        newTemplate.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
       });
     });
+    if(childId!==ch.id)setChildId(ch.id);
     upd({subjects:newSubjects,weeklyTemplate:newTemplate});
   };
 
@@ -874,7 +876,7 @@ export default function App(){
                           <div className={`w-10 h-10 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-lg font-bold flex-shrink-0`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
                           <div className="flex-1">
                             <p className="font-semibold text-slate-700">{ch.name}</p>
-                            <p className="text-xs text-slate-400">Нажми, чтобы свернуть</p>
+                            <p className="text-xs text-slate-400">{!calcGrade(ch)?"⚠️ Укажи год поступления и нажми Сохранить":"Нажми, чтобы свернуть"}</p>
                           </div>
                           <span className="text-slate-300 text-lg">∧</span>
                         </div>
@@ -956,6 +958,7 @@ export default function App(){
                             if(!s){s={id:uid(),name,c:ns.length%SC.length};ns.push(s);}
                             nt.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
                           });});
+                          if(childId!==ch.id)setChildId(ch.id);
                           upd({subjects:ns,weeklyTemplate:nt});
                         }} className="mt-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 hover:bg-emerald-100 transition-all">
                           ✨ Заполнить расписание
