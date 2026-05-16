@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
+import ScheduleTab from "./tabs/ScheduleTab";
+import HomeworkTab from "./tabs/HomeworkTab";
+import GradesTab from "./tabs/GradesTab";
+import { maskTime } from "./utils";
 
 const DAYS=["Пн","Вт","Ср","Чт","Пт","Сб"];
 const DAYS_FULL=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
@@ -13,10 +17,11 @@ const GC2={"5":{bg:"#EAF3DE",tc:"#3B6D11"},"4":{bg:"#E6F1FB",tc:"#185FA5"},"3":{
 const DEF_ORDER=["last","subjs","hw"];
 const DEF_COLL=["last","subjs","hw"];
 
-const uid=()=>Math.random().toString(36).slice(2,9);
+const uid=()=>crypto.randomUUID();
 const toDay=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const isMobile=()=>/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const lessonTime=n=>{const m=8*60+(n-1)*60,h=Math.floor(m/60),mm=m%60;return(h<0||h>23)?"":`${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;};
+const LESSON_TIMES=["","08:00","08:50","09:40","10:35","11:35","12:25","13:15"];
+const lessonTime=n=>LESSON_TIMES[n]||"";
 const LNS=[-2,-1,0,1,2,3,4,5,6,7,8];
 const getMonday=d=>{const x=new Date(d),dy=x.getDay();x.setDate(x.getDate()-(dy===0?6:dy-1));x.setHours(0,0,0,0);return x;};
 const weekDates=mon=>Array.from({length:6},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
@@ -90,29 +95,20 @@ export default function App(){
   const [userRec,setUserRec]=useState(null);
   const [dbData,setDbData]=useState(null);
   const [step,setStep]=useState("loading");
-  const [cid,setCid]=useState(null);
+  const [childId,setChildId]=useState(null);
   const [tab,setTab]=useState(0);
-  const [mon,setMon]=useState(()=>getMonday(new Date()));
-  const [aDate,setADate]=useState(toDay);
-  const [egid,setEgid]=useState(null);
+  const [expandedGradeId,setExpandedGradeId]=useState(null);
   const [codeInput,setCodeInput]=useState("");
   const [codeErr,setCodeErr]=useState("");
   const [codeLoading,setCodeLoading]=useState(false);
   const [showCode,setShowCode]=useState(false);
   const [newChild,setNewChild]=useState({name:"",birthYear:"",schoolYear:""});
-  const [lF,setLF]=useState({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
-  const [hwF,setHwF]=useState({subjectId:"",lessonId:"",task:"",due:toDay(),hwType:"hw"});
-  const [grF,setGrF]=useState({subjectId:"",value:"5",date:toDay(),type:"class"});
-  const [clF,setClF]=useState({name:"",day:"Пн",time:"",comment:"",repeat:true});
-  const [sjF,setSjF]=useState("");
+  const [clubForm,setClubForm]=useState({name:"",day:"Пн",time:"",comment:"",repeat:true});
+  const [newSubjectName,setNewSubjectName]=useState("");
   const [editC,setEditC]=useState({});
   const [selSubj,setSelSubj]=useState(null);
   const [statsOrder,setStatsOrder]=useState(DEF_ORDER);
   const [statsColl,setStatsColl]=useState(new Set(DEF_COLL));
-  const [showAddLesson,setShowAddLesson]=useState(false);
-  const [showAddClub0,setShowAddClub0]=useState(false);
-  const [showAddHw,setShowAddHw]=useState(false);
-  const [showAddGrade,setShowAddGrade]=useState(false);
   const [showAddClub,setShowAddClub]=useState(false);
   const [showAddSubj,setShowAddSubj]=useState(false);
   const [showAddChild,setShowAddChild]=useState(false);
@@ -128,9 +124,14 @@ export default function App(){
   const [phoneErr,setPhoneErr]=useState("");
   const [phoneLoading,setPhoneLoading]=useState(false);
   const [confirmResult,setConfirmResult]=useState(null);
+  const [showDeleteFamilyConfirm,setShowDeleteFamilyConfirm]=useState(false);
+  const [showRemoveChild,setShowRemoveChild]=useState(false);
+  const [pendingRemoveId,setPendingRemoveId]=useState(null);
 
   useEffect(()=>{
-    getRedirectResult(auth).catch(console.error);
+    getRedirectResult(auth).then(result=>{
+      if(result?.user)console.info("redirect sign-in:",result.user.uid);
+    }).catch(console.error);
     const unsub=onAuthStateChanged(auth,async u=>{
       setUser(u);
       if(!u){setStep("login");setDbData(null);setUserRec(null);return;}
@@ -145,25 +146,92 @@ export default function App(){
             if(rec.statsPrefs.coll)setStatsColl(new Set(rec.statsPrefs.coll));
           }
           const fDoc=await getDoc(doc(db,"families",rec.familyId));
-          if(fDoc.exists()){setDbData(fDoc.data());if(rec.childId)setCid(rec.childId);setStep("select");}
+          if(fDoc.exists()){setDbData(fDoc.data());if(rec.childId)setChildId(rec.childId);setStep("select");}
           else setStep("setup");
         }else setStep("setup");
       }catch(e){console.error(e);setStep("setup");}
     });
-    return unsub;
+    return ()=>{
+      unsub();
+      if(window.recaptchaVerifier){
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier=null;
+      }
+    };
   },[]);
 
-  const save=async d=>{
-    setDbData(d);
-    try{await setDoc(doc(db,"families",userRec.familyId),d);}catch(e){console.error(e);}
-  };
+  const save=useCallback(async patch=>{
+    setDbData(prev=>({...prev,...patch}));
+    try{await updateDoc(doc(db,"families",userRec.familyId),patch);}
+    catch(e){console.error(e);}
+  },[userRec]);
+
   const saveStatsPrefs=useCallback(async(order,coll)=>{
     try{await setDoc(doc(db,"users",user.uid),{statsPrefs:{order:[...order],coll:[...coll]}},{merge:true});}catch(e){console.error(e);}
   },[user]);
   const setOrderAndSave=order=>{setStatsOrder(order);saveStatsPrefs(order,statsColl);};
   const setCollAndSave=coll=>{setStatsColl(coll);saveStatsPrefs(statsOrder,coll);};
-  const login=()=>isMobile()?signInWithRedirect(auth,provider).catch(console.error):signInWithPopup(auth,provider).catch(console.error);
-  const logout=async()=>{await signOut(auth);setStep("login");setCid(null);setUserRec(null);setDbData(null);};
+
+  const login=useCallback(()=>isMobile()
+    ?signInWithRedirect(auth,provider).catch(console.error)
+    :signInWithPopup(auth,provider).catch(console.error),[]);
+
+  const logout=useCallback(async()=>{
+    await signOut(auth);
+    setStep("login");
+    setChildId(null);
+    setUserRec(null);
+    setDbData(null);
+  },[]);
+
+  // ── Данные ребёнка (вычисляются до ранних return, чтобы useMemo был без условий) ──
+  const chTpl=((dbData||{}).weeklyTemplate||[]).filter(l=>l.childId===childId);
+  const chHw=((dbData||{}).homework||[]).filter(h=>h.childId===childId);
+  const chGr=((dbData||{}).grades||[]).filter(g=>g.childId===childId);
+
+  const lessonsFor=useMemo(()=>{
+    const cache={};
+    return dateStr=>{
+      if(cache[dateStr])return cache[dateStr];
+      const d=sd(dateStr),di=(d.getDay()+6)%7;
+      if(di>=6){cache[dateStr]=[];return[];}
+      const dateEntries=((dbData?.dateSchedule)||[])
+        .filter(l=>l.childId===childId&&l.date===dateStr);
+      const cancelledSlots=new Set(
+        dateEntries.filter(l=>l.cancelsSlot!=null).map(l=>l.cancelsSlot)
+      );
+      const tplLessons=chTpl
+        .filter(l=>l.day===DAYS[di])
+        .map(l=>{
+          if(cancelledSlots.has(l.lessonNum)){
+            const entry=dateEntries.find(e=>e.cancelsSlot===l.lessonNum);
+            // 'cancel' → struck-through; 'move' → show source slot as "moved away"; 'replace' → drop (substitution row handles it)
+            if(entry?.type==='cancel')return{...l,_cancelled:true};
+            if(entry?.type==='move')return{...l,_movedAway:true,_moveEntry:entry};
+            return null;
+          }
+          return l;
+        })
+        .filter(Boolean);
+      const addedEntries=dateEntries.filter(l=>l.subjectId&&l.type!=='cancel');
+      const result=[...tplLessons,...addedEntries]
+        .sort((a,b)=>(+a.lessonNum||99)-(+b.lessonNum||99));
+      cache[dateStr]=result;
+      return result;
+    };
+  },[dbData?.weeklyTemplate,dbData?.dateSchedule,childId]);
+
+  const sjGrades=useMemo(()=>{
+    const cache={};
+    return sid=>{
+      if(cache[sid])return cache[sid];
+      const fHw=chHw.filter(h=>h.subjectId===sid&&h.grade)
+        .map(h=>({id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}));
+      cache[sid]=[...fHw,...chGr.filter(g=>g.subjectId===sid)]
+        .sort((a,b)=>b.date.localeCompare(a.date));
+      return cache[sid];
+    };
+  },[chHw,chGr]);
 
   const createFamily=async()=>{
     setCodeLoading(true);
@@ -195,18 +263,17 @@ export default function App(){
   };
 
   const selectProfile=async ch=>{
-    setCid(ch.id);setStep("app");setTab(0);setEgid(null);setSelSubj(null);
+    setChildId(ch.id);setStep("app");setTab(0);setExpandedGradeId(null);setSelSubj(null);
     if(userRec?.role==="member"){try{await setDoc(doc(db,"users",user.uid),{...userRec,childId:ch.id},{merge:true});}catch{}}
   };
 
   const deleteFamily=async()=>{
-    if(!window.confirm("Удалить семью и ВСЕ данные? Нельзя отменить."))return;
-    if(!window.confirm("Последнее предупреждение. Удалить?"))return;
     try{
       await deleteDoc(doc(db,"families",userRec.familyId));
       await deleteDoc(doc(db,"familyCodes",dbData.familyCode));
       await deleteDoc(doc(db,"users",user.uid));
       setDbData(null);setUserRec(null);setStep("setup");
+      setShowDeleteFamilyConfirm(false);
     }catch(e){console.error(e);alert("Ошибка при удалении.");}
   };
 
@@ -219,6 +286,8 @@ export default function App(){
         window.recaptchaVerifier=new RecaptchaVerifier(auth,"recaptcha-container",{size:"invisible"});
       }
       const result=await signInWithPhoneNumber(auth,num,window.recaptchaVerifier);
+      window.recaptchaVerifier.clear();
+      window.recaptchaVerifier=null;
       setConfirmResult(result);setPhoneStep("code");
     }catch(e){
       console.error(e);setPhoneErr("Ошибка отправки SMS. Проверь номер.");
@@ -321,7 +390,7 @@ export default function App(){
   const cbg=idx=>CBG[(idx||0)%CBG.length];
   const subj=id=>subjects.find(s=>s.id===id);
   const sc=s=>s?SC[s.c%SC.length]:"bg-slate-100 text-slate-600";
-  const upd=patch=>save({...dbData,...patch});
+  const upd=patch=>save(patch);
   const todayStr=toDay();
 
   if(step==="select")return(
@@ -337,7 +406,7 @@ export default function App(){
         :<div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
           {children.map(ch=>(
             <button key={ch.id} onClick={()=>selectProfile(ch)} className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-md active:scale-95 transition-all">
-              <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{ch.name[0].toUpperCase()}</div>
+              <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
               <span className="text-slate-700 font-semibold text-sm">{ch.name}</span>
               {ch.grade&&<span className="text-xs text-slate-400">{ch.grade} класс</span>}
             </button>
@@ -356,24 +425,11 @@ export default function App(){
   );
 
   // ── Основное приложение ──────────────────────────────────────────────────────
-  const chTpl=weeklyTemplate.filter(l=>l.childId===cid);
-  const chHw=homework.filter(h=>h.childId===cid);
-  const chGr=grades.filter(g=>g.childId===cid);
-  const chCl=clubs.filter(c=>c.childId===cid);
+  const chCl=clubs.filter(c=>c.childId===childId);
   const schSubjIds=[...new Set(chTpl.map(l=>l.subjectId))];
   const schSubjs=subjects.filter(s=>schSubjIds.includes(s.id));
-  const activeCh=children.find(c=>c.id===cid);
+  const activeCh=children.find(c=>c.id===childId);
 
-  const lessonsFor=dateStr=>{
-    const d=sd(dateStr),di=(d.getDay()+6)%7;
-    if(di>=6)return[];
-    return[...chTpl.filter(l=>l.day===DAYS[di]),...(dateSchedule||[]).filter(l=>l.childId===cid&&l.date===dateStr)]
-      .sort((a,b)=>(+a.lessonNum||99)-(+b.lessonNum||99));
-  };
-  const sjGrades=sid=>{
-    const fHw=chHw.filter(h=>h.subjectId===sid&&h.grade).map(h=>({id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}));
-    return[...fHw,...chGr.filter(g=>g.subjectId===sid)].sort((a,b)=>b.date.localeCompare(a.date));
-  };
   const avgGrade=sid=>{
     const gs=sjGrades(sid).map(g=>+g.value).filter(Boolean);
     return gs.length?(gs.reduce((a,b)=>a+b,0)/gs.length).toFixed(1):null;
@@ -381,21 +437,21 @@ export default function App(){
   const delGrade=g=>{
     if(g.type==="hw")upd({homework:homework.map(h=>h.id===g.hwId?{...h,grade:null}:h)});
     else upd({grades:grades.filter(x=>x.id!==g.id)});
-    setEgid(null);
+    setExpandedGradeId(null);
   };
   const chgGrade=(g,v)=>{
     if(!v){delGrade(g);return;}
     if(g.type==="hw")upd({homework:homework.map(h=>h.id===g.hwId?{...h,grade:v}:h)});
     else upd({grades:grades.map(x=>x.id===g.id?{...x,value:v}:x)});
-    setEgid(null);
+    setExpandedGradeId(null);
   };
 
   const GChip=({g})=>{
-    const isE=egid===g.id;
+    const isE=expandedGradeId===g.id;
     return(
       <div className="relative">
         <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${GC[g.value]||"bg-slate-100"} ${isKR(g.type)?"ring-2 ring-current":""} ${isOwner?"cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-current":"cursor-default"}`}
-          onClick={e=>{e.stopPropagation();isOwner&&setEgid(isE?null:g.id);}}>
+          onClick={e=>{e.stopPropagation();isOwner&&setExpandedGradeId(isE?null:g.id);}}>
           <span className="text-xs">{gradeIcon(g.type)}</span>
           <span className="font-bold text-sm">{g.value}</span>
           {g.date&&<span className="opacity-50">{fmtDate(g.date)}</span>}
@@ -428,7 +484,7 @@ export default function App(){
               <button onClick={()=>{upd({grades:grades.map(x=>x.id===g.id?{...x,comment:editC["gr_"+g.id]??(g.comment||"")}:x)});setEditC(p=>({...p,["gr_"+g.id]:undefined}));}}
                 className="mt-1 w-full text-xs bg-blue-50 text-blue-500 py-1 border border-blue-100 rounded-lg hover:bg-blue-100">Сохранить</button>
             </div>
-            <button onClick={()=>delGrade(g)} className="mt-2 w-full text-xs text-red-400 py-1 border border-red-100 rounded-lg hover:bg-red-50">Удалить</button>
+            <button onClick={e=>{e.stopPropagation();delGrade(g);}} className="mt-2 w-full text-xs text-red-400 py-1 border border-red-100 rounded-lg hover:bg-red-50">Удалить</button>
           </div>
         )}
       </div>
@@ -437,18 +493,10 @@ export default function App(){
 
   const SBadge=({sid})=>{const s=subj(sid);return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>;};
   const hwPending=chHw.filter(h=>!h.done&&h.hwType!=="kr").length;
-  const wDates=weekDates(mon);
-  const activeDay=DAYS[Math.min((sd(aDate).getDay()+6)%7,5)];
-  const w0=wDates[0],w5=wDates[5];
-  const wLabel=w0.getMonth()===w5.getMonth()?`${w0.getDate()}–${w5.getDate()} ${MON[w0.getMonth()]} ${w0.getFullYear()}`:`${w0.getDate()} ${MON[w0.getMonth()]} – ${w5.getDate()} ${MON[w5.getMonth()]}`;
   const gSubjs=gradeSubjects(activeCh?.grade);
   const schedSubjNames=[...new Set(chTpl.map(l=>subj(l.subjectId)?.name).filter(Boolean))];
   const availSubjNames=gSubjs?[...new Set([...gSubjs,...schedSubjNames])]:subjects.map(s=>s.name);
-  const getOrMakeSubj=name=>{const ex=subjects.find(s=>s.name===name);if(ex)return{subjects,subjectId:ex.id};const ns={id:uid(),name,c:subjects.length%SC.length};return{subjects:[...subjects,ns],subjectId:ns.id};};
-  const hwDueDay=(()=>{const d=sd(hwF.due),i=(d.getDay()+6)%7;return i<6?DAYS[i]:null;})();
-  const hwDueLessons=hwDueDay?lessonsFor(hwF.due):[];
-  const hwSubjIds=hwDueLessons.length?[...new Set(hwDueLessons.map(l=>l.subjectId))]:schSubjIds;
-  const activeLessons=lessonsFor(aDate);
+  const resolveOrCreateSubject=name=>{const ex=subjects.find(s=>s.name===name);if(ex)return{subjects,subjectId:ex.id};const ns={id:uid(),name,c:subjects.length%SC.length};return{subjects:[...subjects,ns],subjectId:ns.id};};
   const TABS=isOwner?["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]:["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки"];
 
   const addChild=()=>{
@@ -461,46 +509,44 @@ export default function App(){
     setNewChild({name:"",birthYear:"",schoolYear:""});
   };
   const remChild=id=>{
-    if(!window.confirm("Удалить профиль и все данные?"))return;
     upd({children:children.filter(c=>c.id!==id),weeklyTemplate:weeklyTemplate.filter(l=>l.childId!==id),dateSchedule:(dateSchedule||[]).filter(l=>l.childId!==id),homework:homework.filter(h=>h.childId!==id),grades:grades.filter(g=>g.childId!==id),clubs:clubs.filter(c=>c.childId!==id)});
-    if(cid===id)setCid(null);
+    if(childId===id)setChildId(null);
+    setShowRemoveChild(false);
+    setPendingRemoveId(null);
   };
 
-  // ── Статистика ───────────────────────────────────────────────────────────────
-  const SEC_TITLES={last:"Последние оценки",subjs:"Успеваемость по предметам",hw:"Домашние задания"};
-  const renderStatsSec=(id,content)=>{
-    if(!content)return null;
-    const title=SEC_TITLES[id];
-    if(!title)return <div key={id} style={{marginBottom:"12px"}}>{content}</div>;
-    const collapsed=statsColl.has(id);
-    const movable=statsOrder.filter(x=>SEC_TITLES[x]);
-    const midx=movable.indexOf(id);
-    const toggle=()=>{const n=new Set(statsColl);n.has(id)?n.delete(id):n.add(id);setCollAndSave(n);};
-    const moveUp=()=>{const a=[...statsOrder],i=a.indexOf(id);if(i>0){[a[i-1],a[i]]=[a[i],a[i-1]];setOrderAndSave(a);}};
-    const moveDown=()=>{const a=[...statsOrder],i=a.indexOf(id);if(i<a.length-1){[a[i],a[i+1]]=[a[i+1],a[i]];setOrderAndSave(a);}};
-    return(
-      <div key={id} style={{marginBottom:"12px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-          <button onClick={toggle} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between",background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:collapsed?"14px":"14px 14px 0 0",padding:"10px 14px",cursor:"pointer",textAlign:"left"}}>
-            <span style={{fontSize:"13px",fontWeight:"500",color:"#1e293b"}}>{title}</span>
-            <span style={{fontSize:"14px",color:"#94a3b8",display:"inline-block",transform:collapsed?"rotate(-90deg)":"rotate(0deg)",transition:"transform 0.15s"}}>⌄</span>
-          </button>
-          <div style={{display:"flex",flexDirection:"column",gap:"2px"}}>
-            <button onClick={moveUp} style={{width:"24px",height:"22px",border:"0.5px solid #e2e8f0",borderRadius:"6px",background:"#fff",cursor:"pointer",fontSize:"12px",color:"#94a3b8",opacity:midx===0?"0.3":"1"}}>↑</button>
-            <button onClick={moveDown} style={{width:"24px",height:"22px",border:"0.5px solid #e2e8f0",borderRadius:"6px",background:"#fff",cursor:"pointer",fontSize:"12px",color:"#94a3b8",opacity:midx===movable.length-1?"0.3":"1"}}>↓</button>
-          </div>
-        </div>
-        {!collapsed&&<div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderTop:"none",borderRadius:"0 0 14px 14px",padding:"14px"}}>{content}</div>}
-      </div>
-    );
-  };
-
-
-  const seedSchedule = () => {
+  const seedSchedule=()=>{
     if(!activeCh?.grade)return alert("У ребёнка не указан класс. Укажи год поступления в разделе Семья.");
-    if(!window.confirm(`Заполнить пример расписания для ${activeCh.name} (${activeCh.grade} класс)? Текущее расписание останется.`))return;
     const grade=activeCh.grade;
     const scheduleByGrade={
+      1:[
+        {day:"Пн",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир"]},
+        {day:"Вт",subjects:["Русский язык","Математика","Литературное чтение","Музыка"]},
+        {day:"Ср",subjects:["Русский язык","Математика","Литературное чтение","ИЗО"]},
+        {day:"Чт",subjects:["Русский язык","Математика","Литературное чтение","Физкультура"]},
+        {day:"Пт",subjects:["Русский язык","Математика","Технология","Окружающий мир"]},
+      ],
+      2:[
+        {day:"Пн",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир","Физкультура"]},
+        {day:"Вт",subjects:["Русский язык","Математика","Литературное чтение","Музыка","ИЗО"]},
+        {day:"Ср",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир","Технология"]},
+        {day:"Чт",subjects:["Русский язык","Математика","Литературное чтение","Физкультура","ИЗО"]},
+        {day:"Пт",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка"]},
+      ],
+      3:[
+        {day:"Пн",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык"]},
+        {day:"Вт",subjects:["Русский язык","Математика","Литературное чтение","Музыка","ИЗО"]},
+        {day:"Ср",subjects:["Русский язык","Математика","Английский язык","Окружающий мир","Технология"]},
+        {day:"Чт",subjects:["Русский язык","Математика","Литературное чтение","Физкультура","ИЗО"]},
+        {day:"Пт",subjects:["Русский язык","Математика","Литературное чтение","Английский язык","Физкультура"]},
+      ],
+      4:[
+        {day:"Пн",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык"]},
+        {day:"Вт",subjects:["Русский язык","Математика","Литературное чтение","Музыка","ИЗО","Физкультура"]},
+        {day:"Ср",subjects:["Русский язык","Математика","Английский язык","Окружающий мир","Технология"]},
+        {day:"Чт",subjects:["Русский язык","Математика","Литературное чтение","Физкультура","ИЗО"]},
+        {day:"Пт",subjects:["Русский язык","Математика","Литературное чтение","Английский язык","Окружающий мир"]},
+      ],
       5:[
         {day:"Пн",subjects:["Русский язык","Математика","История","Английский язык","Физкультура"]},
         {day:"Вт",subjects:["Литература","Математика","Природоведение","ИЗО","Музыка"]},
@@ -551,7 +597,7 @@ export default function App(){
         {day:"Пт",subjects:["Русский язык","Алгебра и начала анализа","Химия","Биология","Английский язык"]},
       ],
     };
-    const g=Math.min(Math.max(grade,5),11);
+    const g=Math.min(Math.max(grade,1),11);
     const plan=scheduleByGrade[g]||scheduleByGrade[8];
     let newSubjects=[...subjects];
     let newTemplate=[...weeklyTemplate];
@@ -559,28 +605,31 @@ export default function App(){
       sNames.forEach((name,i)=>{
         let s=newSubjects.find(x=>x.name===name);
         if(!s){s={id:uid(),name,c:newSubjects.length%SC.length};newSubjects.push(s);}
-        newTemplate.push({id:uid(),childId:cid,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
+        newTemplate.push({id:uid(),childId,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
       });
     });
     upd({subjects:newSubjects,weeklyTemplate:newTemplate});
   };
+
   return(
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans" onClick={()=>egid&&setEgid(null)}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans" onClick={()=>expandedGradeId&&setExpandedGradeId(null)}>
       <div className="max-w-2xl mx-auto p-4" onClick={e=>e.stopPropagation()}>
 
         <div className="flex items-center gap-2 mb-4">
-          <button onClick={()=>{setStep("select");setEgid(null);setSelSubj(null);}} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
+          <button onClick={()=>{setStep("select");setExpandedGradeId(null);setSelSubj(null);}} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
           {isOwner
             ?<div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
               {children.map(ch=>(
-                <button key={ch.id} onClick={()=>setCid(ch.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${cid===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
-                  <span className="font-bold">{ch.name[0]}</span><span>{ch.name}</span>
+                <button key={ch.id} onClick={()=>setChildId(ch.id)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${childId===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
+                  <span className="font-bold">{(ch.name?.[0]??"?")}</span>
+                  <span>{ch.name}</span>
+                  {ch.grade&&<span className={`text-xs ${childId===ch.id?"opacity-70":"text-slate-400"}`}>{ch.grade}кл</span>}
                 </button>
               ))}
             </div>
             :<div className="flex items-center gap-2 flex-1">
-              {activeCh&&<div className={`w-8 h-8 rounded-full ${cbg(activeCh.colorIdx)} flex items-center justify-center text-white font-bold text-sm`}>{activeCh.name[0]}</div>}
+              {activeCh&&<div className={`w-8 h-8 rounded-full ${cbg(activeCh.colorIdx)} flex items-center justify-center text-white font-bold text-sm`}>{(activeCh.name?.[0]??"?")}</div>}
               <span className="font-semibold text-slate-700">{activeCh?.name||"Дневник"}</span>
             </div>
           }
@@ -596,478 +645,38 @@ export default function App(){
         </div>
 
         {/* TAB 0: РАСПИСАНИЕ */}
-        {tab===0&&(
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-slate-700">{wLabel}</p>
-                {ds(mon)!==ds(getMonday(new Date()))&&<button onClick={()=>{setMon(getMonday(new Date()));setADate(toDay());}} className="text-xs text-blue-500 hover:underline">← сегодня</button>}
-                {isOwner&&chTpl.length===0&&<button onClick={seedSchedule} className="text-xs text-emerald-500 hover:underline">✨ Заполнить пример</button>}
-              </div>
-              <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
-            </div>
-            <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-              {wDates.map((d,i)=>{
-                const dstr=ds(d),isToday=dstr===todayStr,isActive=dstr===aDate;
-                const has=lessonsFor(dstr).length>0;
-                const hasKR=chHw.some(h=>h.hwType==="kr"&&h.date===dstr);
-                const hasClub=chCl.some(c=>c.day===DAYS[i]);
-                return(
-                  <button key={i} onClick={()=>setADate(dstr)}
-                    className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-blue-500 text-white shadow-md":isToday?"bg-blue-100 text-blue-700 border-2 border-blue-300":"bg-white text-slate-600 hover:bg-slate-100"}`}>
-                    <span>{DAYS[i]}</span>
-                    <span className={`text-xs font-normal mt-0.5 ${isActive?"text-blue-100":isToday?"text-blue-600":"text-slate-400"}`}>{d.getDate()}</span>
-                    <div className="flex gap-0.5 mt-1 justify-center">
-                      {has&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-blue-200":"bg-blue-400"}`}/>}
-                      {hasKR&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-red-300":"bg-red-500"}`}/>}
-                      {hasClub&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-green-300":"bg-green-500"}`}/>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <Card cls="mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-slate-700">{DAYS_FULL[DAYS.indexOf(activeDay)]}, {sd(aDate).getDate()} {MON[sd(aDate).getMonth()]}</h2>
-                {aDate===todayStr&&<span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Сегодня</span>}
-              </div>
-              {(()=>{
-                const krToday=chHw.filter(h=>h.hwType==="kr"&&h.date===aDate);
-                if(krToday.length>0)return(
-                  <div className="mb-3 space-y-1">
-                    {krToday.map(h=>{const s=subj(h.subjectId);return(
-                      <div key={h.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 border-2 border-red-300 ${h.done?"opacity-40":""}`}>
-                        <span className="text-sm">🚨</span>
-                        <span className="text-sm font-bold text-red-600">КР сегодня:</span>
-                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>
-                        {h.task&&h.task!=="Контрольная работа"&&<span className="text-xs text-slate-500 flex-1 truncate">{h.task}</span>}
-                      </div>
-                    );})}
-                  </div>
-                );
-                return null;
-              })()}
-              {(()=>{
-                const dayClubs=chCl.filter(c=>c.day===activeDay);
-                const items=[
-                  ...activeLessons.map(l=>({type:"lesson",key:l.id,sort:l.time?"A"+l.time:"B",data:l})),
-                  ...dayClubs.map(c=>({type:"club",key:"c_"+c.id,sort:c.time?"A"+c.time:"C",data:c})),
-                ].sort((a,b)=>a.sort.localeCompare(b.sort));
-                if(items.length===0)return <p className="text-slate-400 text-sm text-center py-4">Уроков нет</p>;
-                return items.map(item=>{
-                  if(item.type==="lesson"){
-                    const l=item.data,s=subj(l.subjectId),isOnce=!!l.date;
-                    const lGr=sjGrades(l.subjectId).slice(0,1);
-                    const pendHw=chHw.filter(h=>h.subjectId===l.subjectId&&!h.done);
-                    const hasKR=pendHw.some(h=>h.hwType==="kr");
-                    return(
-                      <div key={l.id} className="mb-2 flex items-center gap-2 p-2.5 rounded-xl bg-slate-50">
-                        {l.lessonNum&&<span className="text-slate-400 text-xs w-5 text-center font-bold">{l.lessonNum}</span>}
-                        {l.time&&<span className="text-slate-400 text-xs w-10">{l.time}</span>}
-                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)} cursor-pointer`}
-                          onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}}>
-                          {s?.name||"?"}
-                        </span>
-                        {isOnce&&<span className="text-purple-400 text-xs">📌</span>}
-                        {hasKR?<span className="text-red-500 text-xs">🚨</span>:pendHw.length>0?<span className="text-orange-400 text-xs">📝</span>:null}
-                        {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
-                        {isOwner&&<button onClick={()=>isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
-                      </div>
-                    );
-                  } else {
-                    const c=item.data;
-                    return(
-                      <div key={item.key} className={`mb-2 flex items-center gap-2 p-2.5 rounded-xl cursor-pointer active:opacity-70 ${c.done?"bg-slate-50 opacity-60":"bg-violet-50"}`}
-                        onClick={()=>{setHighlightClub(c.id);setTab(4);}}>
-                        <span className="text-xs w-5 text-center">🎯</span>
-                        {c.time?<span className="text-slate-400 text-xs w-10">{c.time}</span>:<span className="w-10"/>}
-                        <span className="px-2 py-0.5 rounded-lg text-sm font-medium flex-1 bg-violet-100 text-violet-800">{c.name}</span>
-                        {c.comment&&<span className="text-slate-400 text-xs" title={c.comment}>💬</span>}
-                      </div>
-                    );
-                  }
-                });
-              })()}
-            </Card>
-            {isOwner&&(
-              <Card cls="mb-3">
-                <CollapseBtn open={showAddLesson} onToggle={()=>setShowAddLesson(v=>!v)} label="Добавить урок"/>
-                {showAddLesson&&(
-                  <div className="mt-3 space-y-2">
-                    {gSubjs&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎓 Предметы для {activeCh?.grade} класса</p>}
-                    <Sel cls="w-full" value={lF.subjectId} onChange={e=>setLF(p=>({...p,subjectId:e.target.value}))}>
-                      <option value="">Выберите предмет...</option>
-                      {availSubjNames.map(name=>{const s=subjects.find(x=>x.name===name);return <option key={name} value={s?.id||"__new__"+name}>{name}</option>;})}
-                    </Sel>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs text-slate-400">№ урока</label>
-                        <Sel cls="w-32" value={lF.lessonNum} onChange={e=>{const n=e.target.value;setLF(p=>({...p,lessonNum:n,time:lessonTime(+n)}));}}>
-                          {LNS.map(n=><option key={n} value={n}>{n<=0?`${n} (доп.)`:`${n} — ${lessonTime(n)}`}</option>)}
-                        </Sel>
-                      </div>
-                      <div className="flex flex-col gap-1 flex-1">
-                        <label className="text-xs text-slate-400">Время</label>
-                        <Inp cls="w-full" placeholder="08:00" value={lF.time} onChange={e=>setLF(p=>({...p,time:e.target.value}))}/>
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={lF.repeat} onChange={e=>setLF(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
-                      <span className="text-sm text-slate-600">Повторять каждую неделю</span>
-                    </label>
-                    <Btn onClick={()=>{
-                      if(!lF.subjectId)return;
-                      let sid=lF.subjectId,ns=subjects;
-                      if(lF.subjectId.startsWith("__new__")){const r=getOrMakeSubj(lF.subjectId.replace("__new__",""));ns=r.subjects;sid=r.subjectId;}
-                      if(lF.repeat)upd({subjects:ns,weeklyTemplate:[...weeklyTemplate,{id:uid(),childId:cid,subjectId:sid,day:activeDay,lessonNum:+lF.lessonNum,time:lF.time}]});
-                      else upd({subjects:ns,dateSchedule:[...(dateSchedule||[]),{id:uid(),childId:cid,date:aDate,subjectId:sid,lessonNum:+lF.lessonNum,time:lF.time}]});
-                      setLF({subjectId:"",lessonNum:"1",time:lessonTime(1),repeat:true});
-                    }} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
-                    {!lF.repeat&&<p className="text-xs text-purple-500 bg-purple-50 rounded-lg px-3 py-1.5">📌 Только на {sd(aDate).getDate()} {MON[sd(aDate).getMonth()]}</p>}
-                  </div>
-                )}
-              </Card>
-            )}
-            {isOwner&&(
-              <Card>
-                <CollapseBtn open={showAddClub0} onToggle={()=>setShowAddClub0(v=>!v)} label="Добавить кружок"/>
-                {showAddClub0&&(
-                  <div className="mt-3 space-y-2">
-                    <Inp cls="w-full" placeholder="Название" value={clF.name} onChange={e=>setClF(p=>({...p,name:e.target.value}))}/>
-                    <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" rows={2} placeholder="Комментарий (необязательно)"
-                      value={clF.comment||""} onChange={e=>setClF(p=>({...p,comment:e.target.value}))}/>
-                    <div className="flex gap-2">
-                      <Sel cls="flex-1" value={clF.day} onChange={e=>setClF(p=>({...p,day:e.target.value}))}>
-                        {DAYS.map(d=><option key={d} value={d}>{DAYS_FULL[DAYS.indexOf(d)]}</option>)}
-                      </Sel>
-                      <Inp cls="w-20" placeholder="17:00" value={clF.time} onChange={e=>setClF(p=>({...p,time:e.target.value}))}/>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={clF.repeat!==false} onChange={e=>setClF(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
-                      <span className="text-sm text-slate-600">Повторять каждую неделю</span>
-                    </label>
-                    <Btn onClick={()=>{
-                      if(!clF.name.trim())return;
-                      upd({clubs:[...clubs,{id:uid(),childId:cid,...clF,done:false}]});
-                      setClF({name:"",day:activeDay,time:"",comment:"",repeat:true});
-                      setShowAddClub0(false);
-                    }} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
-                  </div>
-                )}
-              </Card>
-            )}
-          </div>
-        )}
+        {tab===0&&<ScheduleTab
+          childId={childId} isOwner={isOwner} chHw={chHw} chCl={chCl} chTpl={chTpl}
+          subjects={subjects} weeklyTemplate={weeklyTemplate} dateSchedule={dateSchedule} clubs={clubs}
+          activeCh={activeCh} gSubjs={gSubjs} availSubjNames={availSubjNames}
+          upd={upd} subj={subj} sc={sc} lessonsFor={lessonsFor} sjGrades={sjGrades}
+          seedSchedule={seedSchedule} resolveOrCreateSubject={resolveOrCreateSubject}
+          uid={uid} setSelSubj={setSelSubj} setTab={setTab} setHighlightClub={setHighlightClub}
+          homework={homework}
+          Card={Card} GBadge={GBadge} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
+        />}
 
         {/* TAB 1: ЗАДАНИЯ */}
-        {tab===1&&(
-          <div>
-            <div className="space-y-3 mb-4">
-              {chHw.length===0?<Empty txt="Заданий нет 🎉"/>
-                :[...chHw].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(h=>(
-                <Card key={h.id} cls={`${h.done?"opacity-70":""} ${h.hwType==="kr"?"border-2 border-red-300":""}`}>
-                  <div className="flex items-start gap-3">
-                    <button onClick={()=>upd({homework:homework.map(x=>x.id===h.id?{...x,done:!x.done}:x)})}
-                      className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"border-slate-300 hover:border-green-400"}`}>
-                      {h.done&&"✓"}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {h.hwType==="kr"&&<span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg border border-red-200">🚨 КР</span>}
-                        <SBadge sid={h.subjectId}/>
-                        {h.date&&<span className="text-xs text-slate-400">до {fmtDate(h.date)}</span>}
-                        {h.grade&&(isOwner?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}}/>:<GBadge v={h.grade} type="hw"/>)}
-                      </div>
-                      <p className={`text-sm text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
-                      {h.comment&&(<div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"><p className="text-xs text-amber-600 font-medium">💬 Родитель:</p><p className="text-xs text-amber-800 mt-0.5">{h.comment}</p></div>)}
-                      {isOwner&&(
-                        <div className="mt-3 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <GPicker value={h.grade} onChange={g=>upd({homework:homework.map(x=>x.id===h.id?{...x,grade:g}:x)})}/>
-                            <span className="text-xs text-slate-400">оценка</span>
-                          </div>
-                          <div className="flex gap-2 items-end">
-                            <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none" placeholder="Комментарий для ребёнка..." rows={2}
-                              value={editC[h.id]??h.comment} onChange={e=>setEditC(p=>({...p,[h.id]:e.target.value}))}/>
-                            <button onClick={()=>{upd({homework:homework.map(x=>x.id===h.id?{...x,comment:editC[h.id]??h.comment}:x)});setEditC(p=>({...p,[h.id]:undefined}));}}
-                              className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {isOwner&&<button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
-                  </div>
-                </Card>
-              ))}
-            </div>
-            {isOwner&&(
-              <Card>
-                <CollapseBtn open={showAddHw} onToggle={()=>setShowAddHw(v=>!v)} label="Добавить задание"/>
-                {showAddHw&&(
-                  <div className="mt-3 space-y-2">
-                    <Inp type="date" cls="w-full" value={hwF.due} onChange={e=>setHwF(p=>({...p,due:e.target.value,subjectId:"",lessonId:""}))}/>
-                    <div className="flex gap-2">
-                      <Sel cls="flex-1" value={hwF.subjectId} onChange={e=>setHwF(p=>({...p,subjectId:e.target.value,lessonId:""}))}>
-                        <option value="">Предмет...</option>
-                        {schSubjs.filter(s=>hwSubjIds.includes(s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                      </Sel>
-                      <div className="flex gap-1">
-                        <button onClick={()=>setHwF(p=>({...p,hwType:"hw"}))}
-                          className={`px-3 py-2 rounded-lg text-sm border-2 transition-all ${hwF.hwType!=="kr"?"bg-blue-500 text-white border-blue-500":"bg-white text-slate-500 border-slate-200"}`}>📝</button>
-                        <button onClick={()=>setHwF(p=>({...p,hwType:"kr"}))}
-                          className={`px-3 py-2 rounded-lg text-sm border-2 transition-all ${hwF.hwType==="kr"?"bg-red-500 text-white border-red-500":"bg-white text-slate-500 border-slate-200"}`}>🚨</button>
-                      </div>
-                    </div>
-                    <Sel cls="w-full" value={hwF.lessonId} onChange={e=>setHwF(p=>({...p,lessonId:e.target.value}))}>
-                      <option value="">Привязать к уроку (необязательно)</option>
-                      {hwDueLessons.filter(l=>!hwF.subjectId||l.subjectId===hwF.subjectId).map(l=>{
-                        const s=subj(l.subjectId),dn=DAYS_FULL[DAYS.indexOf(DAYS[Math.min((sd(hwF.due).getDay()+6)%7,5)])];
-                        return <option key={l.id} value={l.id}>{[dn,l.lessonNum&&`${l.lessonNum} урок`,l.time].filter(Boolean).join(", ")} — {s?.name}</option>;
-                      })}
-                    </Sel>
-                    <div className="flex gap-2 items-end">
-                      <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-                        placeholder={hwF.hwType==="kr"?"Тема КР (необязательно)":"Что задали?"} rows={2}
-                        value={hwF.task} onChange={e=>setHwF(p=>({...p,task:e.target.value}))}/>
-                      <Btn onClick={()=>{
-                        if(!hwF.subjectId)return;
-                        if(hwF.hwType!=="kr"&&!hwF.task.trim())return;
-                        const taskText=hwF.task.trim()||(hwF.hwType==="kr"?"Контрольная работа":"");
-                        upd({homework:[...homework,{id:uid(),childId:cid,subjectId:hwF.subjectId,date:hwF.due,lessonId:hwF.lessonId,task:taskText,hwType:hwF.hwType||"hw",done:false,grade:null,comment:""}]});
-                        setHwF(p=>({...p,lessonId:"",task:"",hwType:"hw"}));
-                      }} cls="bg-blue-500 text-white hover:bg-blue-600 mb-0.5">+</Btn>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )}
-          </div>
-        )}
+        {tab===1&&<HomeworkTab
+          childId={childId} isOwner={isOwner} homework={homework} schSubjs={schSubjs}
+          schSubjIds={schSubjIds} chHw={chHw} lessonsFor={lessonsFor} upd={upd}
+          subj={subj} uid={uid} editC={editC} setEditC={setEditC}
+          Card={Card} Empty={Empty} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
+          GChip={GChip} GBadge={GBadge} GPicker={GPicker} SBadge={SBadge}
+        />}
 
-        {/* TAB 2: ОЦЕНКИ */}
-        {tab===2&&(
-          <div>
-            {isOwner&&<p className="text-xs text-slate-400 mb-3 text-center">Нажмите на оценку для изменения · на предмет — для статистики</p>}
-            <div className="space-y-3 mb-4">
-              {schSubjs.some(s=>sjGrades(s.id).length>0)
-                ?schSubjs.filter(s=>sjGrades(s.id).length>0).map(s=>{
-                  const gs=sjGrades(s.id),av=avgGrade(s.id);
-                  return(
-                    <Card key={s.id} cls="border border-slate-200 cursor-pointer hover:shadow-md transition-all" onClick={()=>{setSelSubj(s.id);setTab(3);}}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
-                        {av&&<span className={`px-2 py-1 rounded-lg text-sm font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср: {av}</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-2">{gs.map((g,i)=><GChip key={i} g={g}/>)}</div>
-                    </Card>
-                  );
-                })
-                :<Empty txt="Оценок ещё нет"/>
-              }
-            </div>
-            {isOwner&&(
-              <Card>
-                <CollapseBtn open={showAddGrade} onToggle={()=>setShowAddGrade(v=>!v)} label="Добавить оценку"/>
-                {showAddGrade&&(
-                  schSubjs.length===0
-                    ?<p className="text-xs text-slate-400 text-center py-2 mt-3">Сначала добавьте предметы в расписание</p>
-                    :<div className="mt-3 space-y-2">
-                      <div className="flex gap-2">
-                        <Sel cls="flex-1" value={grF.subjectId} onChange={e=>setGrF(p=>({...p,subjectId:e.target.value}))}>
-                          <option value="">Предмет...</option>
-                          {schSubjs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                        </Sel>
-                        <Sel cls="w-36" value={grF.type} onChange={e=>setGrF(p=>({...p,type:e.target.value}))}>
-                          <option value="class">🙋 Устно</option>
-                          <option value="test">📋 КР</option>
-                          <option value="hw">✏️ Письменно</option>
-                        </Sel>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <GPicker value={grF.value} onChange={v=>setGrF(p=>({...p,value:v||"5"}))}/>
-                        <Inp type="date" cls="flex-1" value={grF.date} onChange={e=>setGrF(p=>({...p,date:e.target.value}))}/>
-                        <Btn onClick={()=>{
-                          if(!grF.subjectId||!grF.value)return;
-                          upd({grades:[...grades,{id:uid(),childId:cid,...grF,comment:"",hwId:null}]});
-                          setGrF(p=>({...p,value:"5",date:toDay()}));
-                        }} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
-                      </div>
-                    </div>
-                )}
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: СТАТИСТИКА */}
-        {tab===3&&(()=>{
-          if(selSubj){
-            const s=subj(selSubj);if(!s)return null;
-            const gs=sjGrades(selSubj),av=avgGrade(selSubj);
-            const hw=chHw.filter(h=>h.subjectId===selSubj);
-            const wDone=hw.filter(h=>h.done).length;
-            const sorted=[...gs].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-            const vals=sorted.map(g=>+g.value).filter(Boolean);
-            const avg2=vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):null;
-            const half=Math.ceil(vals.length/2);
-            const fA=vals.slice(0,half).reduce((a,b)=>a+b,0)/Math.max(half,1);
-            const sA=vals.length>1?vals.slice(half).reduce((a,b)=>a+b,0)/Math.max(vals.length-half,1):fA;
-            const trend=vals.length>=2?(sA>fA+0.2?"↑":sA<fA-0.2?"↓":"→"):null;
-            const trendColor=trend==="↑"?"#1D9E75":trend==="↓"?"#E24B4A":"#94a3b8";
-            const color=av?bcAvg(parseFloat(av)):"#64748b";
-            return(
-              <div>
-                <button onClick={()=>setSelSubj(null)} className="text-slate-400 hover:text-slate-600 text-sm flex items-center gap-1 mb-4">← Все предметы</button>
-                <div style={{background:color,borderRadius:"18px",padding:"20px",marginBottom:"14px"}}>
-                  <p style={{fontSize:"13px",color:"rgba(255,255,255,0.75)",margin:"0 0 4px"}}>{s.name}</p>
-                  <p style={{fontSize:"42px",fontWeight:"500",color:"#fff",margin:"0",lineHeight:"1"}}>{av||"—"}</p>
-                  <p style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",margin:"6px 0 0"}}>средний балл</p>
-                  <div style={{display:"flex",gap:"20px",marginTop:"16px",paddingTop:"14px",borderTop:"1px solid rgba(255,255,255,0.2)"}}>
-                    <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{gs.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
-                    <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{hw.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>заданий</div></div>
-                    <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{hw.length>0?Math.round(wDone/hw.length*100)+"%":"—"}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>выполнено</div></div>
-                  </div>
-                </div>
-                {sorted.length>0&&(
-                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
-                      <p style={{fontSize:"13px",fontWeight:"500",margin:"0"}}>Оценки</p>
-                      {avg2&&<div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                        <span style={{fontSize:"11px",color:"#94a3b8"}}>среднее</span>
-                        <span style={{fontSize:"13px",fontWeight:"500",color:(GC2[String(Math.round(parseFloat(avg2)))]||{tc:"#64748b"}).tc}}>{avg2}</span>
-                        {trend&&<span style={{fontSize:"13px",color:trendColor}}>{trend}</span>}
-                      </div>}
-                    </div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
-                      {sorted.map((g,i)=>{const cl=gcl(g.value);return(
-                        <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1px",padding:"4px 7px",borderRadius:"7px",background:cl.bg,border:isKR(g.type)?"2px solid "+cl.tc:"2px solid transparent"}}>
-                          <span style={{fontSize:"9px",lineHeight:"1",marginBottom:"1px"}}>{gradeIcon(g.type)}</span>
-                          <span style={{fontSize:"15px",fontWeight:"500",color:cl.tc,lineHeight:"1"}}>{g.value}</span>
-                          {g.date&&<span style={{fontSize:"9px",color:cl.tc,opacity:0.6}}>{fmtDate(g.date)}</span>}
-                        </div>
-                      );})}
-                    </div>
-                  </div>
-                )}
-                {gs.length===0&&<div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px",marginBottom:"14px"}}><p className="text-sm text-slate-400 text-center py-2">Оценок пока нет</p></div>}
-                {hw.length>0&&(
-                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderRadius:"14px",padding:"14px"}}>
-                    <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 12px"}}>Домашние задания</p>
-                    <div className="space-y-2">
-                      {hw.map(h=>(
-                        <div key={h.id} className={`flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 ${h.done?"opacity-60":""}`}>
-                          <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"border-slate-300"}`}>{h.done&&"✓"}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
-                            {h.date&&<p className="text-xs text-slate-400 mt-0.5">до {fmtDate(h.date)}</p>}
-                          </div>
-                          {h.grade&&<span className={`${GC[h.grade]||""} px-1.5 py-0.5 rounded-lg text-xs font-bold`}>{h.grade}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          const ss=schSubjs.map(s=>{
-            const gs=sjGrades(s.id),v=gs.map(g=>+g.value).filter(Boolean);
-            const a=v.length?(v.reduce((x,y)=>x+y,0)/v.length):null;
-            const r=v.slice(0,3),o=v.slice(3,6);
-            const rA=r.length?r.reduce((x,y)=>x+y,0)/r.length:null;
-            const oA=o.length?o.reduce((x,y)=>x+y,0)/o.length:null;
-            return{s,a,n:v.length,t:rA&&oA?(rA>oA?"↑":rA<oA?"↓":"→"):"→"};
-          }).filter(x=>x.n>0).sort((a,b)=>(b.a||0)-(a.a||0));
-          if(!ss.length)return <Empty txt="Оценок пока нет — статистика появится после первых отметок"/>;
-
-          const wS=ds(getMonday(new Date())),wE=ds(wDates[5]);
-          const wH=chHw.filter(h=>h.date>=wS&&h.date<=wE);
-          const wD=wH.filter(h=>h.done).length,wT=wH.length,wp=wT?Math.round(wD/wT*100):0;
-          const aD=chHw.filter(h=>h.done).length,aT=chHw.length,ap=aT?Math.round(aD/aT*100):0;
-          const best=ss[0],worst=ss[ss.length-1];
-          const oa=(ss.reduce((a,x)=>a+(x.a||0),0)/ss.length).toFixed(1);
-          const tg=ss.reduce((a,x)=>a+x.n,0);
-          const lg=schSubjs.flatMap(s=>sjGrades(s.id).map(g=>({...g,sn:s.name}))).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,12);
-
-          const SECTIONS={
-            last:lg.length>0&&(
-              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-                {lg.map((g,i)=>{const cl=gcl(g.value);return(
-                  <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
-                    <div style={{width:"36px",height:"36px",borderRadius:"10px",background:cl.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",border:isKR(g.type)?"2px solid "+cl.tc:"2px solid transparent",boxSizing:"border-box"}}>
-                      <span style={{fontSize:"9px",lineHeight:"1"}}>{gradeIcon(g.type)}</span>
-                      <span style={{fontSize:"14px",fontWeight:"500",color:cl.tc,lineHeight:"1.1"}}>{g.value}</span>
-                    </div>
-                    <div style={{fontSize:"10px",color:"#94a3b8"}}>{g.sn?.split(" ")[0]?.slice(0,4)}</div>
-                  </div>
-                );})}
-              </div>
-            ),
-            subjs:(
-              <div>
-                {ss.map(({s,a,t})=>(
-                  <div key={s.id} onClick={()=>setSelSubj(s.id)} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px",cursor:"pointer",padding:"4px",borderRadius:"8px"}}>
-                    <span style={{fontSize:"12px",flex:"1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
-                    <span style={{fontSize:"12px",color:bcAvg(a),width:"14px",textAlign:"center"}}>{t}</span>
-                    <div style={{flex:"1",maxWidth:"90px",background:"#f1f5f9",borderRadius:"99px",height:"5px"}}>
-                      <div style={{height:"5px",borderRadius:"99px",background:bcAvg(a),width:((a||0)/5*100)+"%"}}/>
-                    </div>
-                    <span style={{fontSize:"13px",fontWeight:"500",minWidth:"30px",textAlign:"right",color:bcAvg(a)}}>{a?.toFixed(1)}</span>
-                  </div>
-                ))}
-              </div>
-            ),
-            hw:(
-              <div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
-                  <div style={{background:"#f8fafc",borderRadius:"10px",padding:"10px",textAlign:"center"}}>
-                    <div style={{fontSize:"22px",fontWeight:"500"}}>{wT>0?wp+"%":"—"}</div>
-                    <div style={{fontSize:"11px",color:"#94a3b8"}}>эта неделя</div>
-                    {wT>0&&<div style={{fontSize:"11px",color:"#94a3b8"}}>{wD} из {wT}</div>}
-                  </div>
-                  <div style={{background:"#f8fafc",borderRadius:"10px",padding:"10px",textAlign:"center"}}>
-                    <div style={{fontSize:"22px",fontWeight:"500"}}>{aT>0?ap+"%":"—"}</div>
-                    <div style={{fontSize:"11px",color:"#94a3b8"}}>всего</div>
-                    {aT>0&&<div style={{fontSize:"11px",color:"#94a3b8"}}>{aD} из {aT}</div>}
-                  </div>
-                </div>
-                {wT>0&&<div style={{background:"#f1f5f9",borderRadius:"99px",height:"7px"}}><div style={{height:"7px",borderRadius:"99px",background:"#1D9E75",width:wp+"%"}}/></div>}
-              </div>
-            ),
-          };
-
-          return(
-            <div>
-              <div style={{background:"#185FA5",borderRadius:"18px",padding:"20px",marginBottom:"12px"}}>
-                <p style={{fontSize:"11px",color:"rgba(255,255,255,0.6)",margin:"0 0 4px",letterSpacing:"0.5px"}}>СРЕДНИЙ БАЛЛ</p>
-                <p style={{fontSize:"42px",fontWeight:"500",color:"#fff",margin:"0",lineHeight:"1"}}>{oa||"—"}</p>
-                <p style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",margin:"6px 0 0"}}>по всем предметам</p>
-                <div style={{display:"flex",gap:"20px",marginTop:"16px",paddingTop:"14px",borderTop:"1px solid rgba(255,255,255,0.15)"}}>
-                  <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{tg}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>оценок</div></div>
-                  <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{ap}%</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>ДЗ выполнено</div></div>
-                  <div><div style={{fontSize:"18px",fontWeight:"500",color:"#fff"}}>{ss.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.55)"}}>предметов</div></div>
-                </div>
-              </div>
-              {ss.length>1&&(
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"12px"}}>
-                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderLeft:"3px solid #1D9E75",borderRadius:"0 14px 14px 0",padding:"14px"}}>
-                    <p style={{fontSize:"11px",color:"#94a3b8",margin:"0 0 5px"}}>Лучший предмет</p>
-                    <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{best.s.name}</p>
-                    <p style={{fontSize:"26px",fontWeight:"500",color:"#1D9E75",margin:"0"}}>{best.a?.toFixed(1)}</p>
-                  </div>
-                  <div style={{background:"#fff",border:"0.5px solid #e2e8f0",borderLeft:"3px solid #E24B4A",borderRadius:"0 14px 14px 0",padding:"14px"}}>
-                    <p style={{fontSize:"11px",color:"#94a3b8",margin:"0 0 5px"}}>Подтянуть</p>
-                    <p style={{fontSize:"13px",fontWeight:"500",margin:"0 0 5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{worst.s.name}</p>
-                    <p style={{fontSize:"26px",fontWeight:"500",color:"#E24B4A",margin:"0"}}>{worst.a?.toFixed(1)}</p>
-                  </div>
-                </div>
-              )}
-              {statsOrder.map(id=>renderStatsSec(id,SECTIONS[id]))}
-            </div>
-          );
-        })()}
+        {/* TAB 2 & 3: ОЦЕНКИ / СТАТИСТИКА */}
+        {(tab===2||tab===3)&&<GradesTab
+          tab={tab} isOwner={isOwner} schSubjs={schSubjs} schSubjIds={schSubjIds}
+          sjGrades={sjGrades} avgGrade={avgGrade}
+          sc={sc} GChip={GChip} upd={upd} grades={grades} uid={uid} childId={childId}
+          chHw={chHw} selSubj={selSubj} setSelSubj={setSelSubj} setTab={setTab}
+          lessonsFor={lessonsFor}
+          statsOrder={statsOrder} statsColl={statsColl}
+          setCollAndSave={setCollAndSave} setOrderAndSave={setOrderAndSave}
+          Card={Card} Empty={Empty} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
+          GPicker={GPicker}
+        />}
 
         {/* TAB 4: КРУЖКИ */}
         {tab===4&&(
@@ -1084,7 +693,9 @@ export default function App(){
                         <Sel cls="flex-1" value={editClubF.day??c.day} onChange={e=>setEditClubF(p=>({...p,day:e.target.value}))}>
                           {DAYS.map(d=><option key={d} value={d}>{DAYS_FULL[DAYS.indexOf(d)]}</option>)}
                         </Sel>
-                        <Inp cls="w-20" placeholder="17:00" value={editClubF.time??c.time??""} onChange={e=>setEditClubF(p=>({...p,time:e.target.value}))}/>
+                        <Inp cls="w-20" placeholder="17:00" inputMode="numeric" maxLength={5}
+                          value={editClubF.time??c.time??""}
+                          onChange={e=>setEditClubF(p=>({...p,time:maskTime(e.target.value)}))}/>
                       </div>
                       <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none" rows={2} placeholder="Комментарий..."
                         value={editClubF.comment??c.comment??""} onChange={e=>setEditClubF(p=>({...p,comment:e.target.value}))}/>
@@ -1121,23 +732,25 @@ export default function App(){
                 <CollapseBtn open={showAddClub} onToggle={()=>setShowAddClub(v=>!v)} label="Добавить кружок"/>
                 {showAddClub&&(
                   <div className="mt-3 space-y-2">
-                    <Inp cls="w-full" placeholder="Название" value={clF.name} onChange={e=>setClF(p=>({...p,name:e.target.value}))}/>
+                    <Inp cls="w-full" placeholder="Название" value={clubForm.name} onChange={e=>setClubForm(p=>({...p,name:e.target.value}))}/>
                     <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" rows={2} placeholder="Комментарий (необязательно)"
-                      value={clF.comment||""} onChange={e=>setClF(p=>({...p,comment:e.target.value}))}/>
+                      value={clubForm.comment||""} onChange={e=>setClubForm(p=>({...p,comment:e.target.value}))}/>
                     <div className="flex gap-2">
-                      <Sel cls="flex-1" value={clF.day} onChange={e=>setClF(p=>({...p,day:e.target.value}))}>
+                      <Sel cls="flex-1" value={clubForm.day} onChange={e=>setClubForm(p=>({...p,day:e.target.value}))}>
                         {DAYS.map(d=><option key={d} value={d}>{DAYS_FULL[DAYS.indexOf(d)]}</option>)}
                       </Sel>
-                      <Inp cls="w-20" placeholder="17:00" value={clF.time} onChange={e=>setClF(p=>({...p,time:e.target.value}))}/>
+                      <Inp cls="w-20" placeholder="17:00" inputMode="numeric" maxLength={5}
+                        value={clubForm.time}
+                        onChange={e=>setClubForm(p=>({...p,time:maskTime(e.target.value)}))}/>
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={clF.repeat!==false} onChange={e=>setClF(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
+                      <input type="checkbox" checked={clubForm.repeat!==false} onChange={e=>setClubForm(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
                       <span className="text-sm text-slate-600">Повторять каждую неделю</span>
                     </label>
                     <Btn onClick={()=>{
-                      if(!clF.name.trim())return;
-                      upd({clubs:[...clubs,{id:uid(),childId:cid,...clF,done:false,comment:clF.comment||""}]});
-                      setClF({name:"",day:"Пн",time:"",comment:"",repeat:true});
+                      if(!clubForm.name.trim())return;
+                      upd({clubs:[...clubs,{id:uid(),childId,...clubForm,done:false,comment:clubForm.comment||""}]});
+                      setClubForm({name:"",day:"Пн",time:"",comment:"",repeat:true});
                     }} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
                   </div>
                 )}
@@ -1153,7 +766,7 @@ export default function App(){
               <CollapseBtn open={showSubjList} onToggle={()=>setShowSubjList(v=>!v)} label={`Предметы ${activeCh?.name||""}${activeCh?.grade?` · ${activeCh.grade} класс`:""}`}/>
               {showSubjList&&(()=>{
                 const gradeSubjNames=gradeSubjects(activeCh?.grade)||[];
-                const allSubjNames=[...new Set([...gradeSubjNames,...schSubjs.map(s=>s.name),...subjects.map(s=>s.name)])];
+                const allSubjNames=[...new Set([...gradeSubjNames,...schSubjs.map(s=>s.name)])];
                 const allSubjs=allSubjNames.map(name=>subjects.find(s=>s.name===name)).filter(Boolean);
                 if(allSubjs.length===0)return <p className="text-slate-400 text-sm text-center py-4 mt-3">Нет предметов — добавьте уроки в расписание</p>;
                 return(
@@ -1178,9 +791,9 @@ export default function App(){
               <CollapseBtn open={showAddSubj} onToggle={()=>setShowAddSubj(v=>!v)} label="Добавить предмет в каталог"/>
               {showAddSubj&&(
                 <div className="mt-3 flex gap-2">
-                  <Inp cls="flex-1" placeholder="Название предмета" value={sjF} onChange={e=>setSjF(e.target.value)}
-                    onKeyDown={e=>{if(e.key==="Enter"&&sjF.trim()){upd({subjects:[...subjects,{id:uid(),name:sjF.trim(),c:subjects.length%SC.length}]});setSjF("");}}}/>
-                  <Btn onClick={()=>{if(!sjF.trim())return;upd({subjects:[...subjects,{id:uid(),name:sjF.trim(),c:subjects.length%SC.length}]});setSjF("");}} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
+                  <Inp cls="flex-1" placeholder="Название предмета" value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"&&newSubjectName.trim()){upd({subjects:[...subjects,{id:uid(),name:newSubjectName.trim(),c:subjects.length%SC.length}]});setNewSubjectName("");}}}/>
+                  <Btn onClick={()=>{if(!newSubjectName.trim())return;upd({subjects:[...subjects,{id:uid(),name:newSubjectName.trim(),c:subjects.length%SC.length}]});setNewSubjectName("");}} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
                 </div>
               )}
             </Card>
@@ -1217,8 +830,7 @@ export default function App(){
                   <button onClick={async()=>{
                     if(!window.confirm("Сгенерировать новый код? Старый перестанет работать для новых входов."))return;
                     const newCode=genCode();
-                    const newData={...dbData,familyCode:newCode};
-                    save(newData);
+                    upd({familyCode:newCode});
                     try{
                       await deleteDoc(doc(db,"familyCodes",dbData.familyCode));
                       await setDoc(doc(db,"familyCodes",newCode),{familyId:userRec.familyId});
@@ -1237,16 +849,30 @@ export default function App(){
                   :children.map(ch=>(
                   <Card key={ch.id}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold`}>{ch.name[0].toUpperCase()}</div>
+                      <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
                       <div className="flex-1">
                         <p className="font-semibold text-slate-700">{ch.name}</p>
                         <p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р.`}{ch.birthYear&&ch.grade?" · ":""}{ch.grade&&`${ch.grade} класс`}</p>
                         <p className="text-xs text-slate-400">{weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий</p>
+                        <div className="flex gap-1 mt-1.5">
+                          <button onClick={()=>upd({children:children.map(x=>x.id===ch.id?{...x,shift:1}:x)})}
+                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${(ch.shift||1)===1?"bg-blue-500 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                            I смена
+                          </button>
+                          <button onClick={()=>upd({children:children.map(x=>x.id===ch.id?{...x,shift:2}:x)})}
+                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${(ch.shift||1)===2?"bg-orange-500 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                            II смена
+                          </button>
+                        </div>
                       {weeklyTemplate.filter(l=>l.childId===ch.id).length===0&&(
                         <button onClick={()=>{
                           const grade=ch.grade;
                           if(!grade){alert("У ребёнка не указан класс. Укажи год поступления.");return;}
                           const schedByGrade={
+                            1:[{day:"Пн",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир"]},{day:"Вт",subs:["Русский язык","Математика","Литературное чтение","Музыка"]},{day:"Ср",subs:["Русский язык","Математика","Литературное чтение","ИЗО"]},{day:"Чт",subs:["Русский язык","Математика","Литературное чтение","Физкультура"]},{day:"Пт",subs:["Русский язык","Математика","Технология","Окружающий мир"]}],
+                            2:[{day:"Пн",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир","Физкультура"]},{day:"Вт",subs:["Русский язык","Математика","Литературное чтение","Музыка","ИЗО"]},{day:"Ср",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир","Технология"]},{day:"Чт",subs:["Русский язык","Математика","Литературное чтение","Физкультура","ИЗО"]},{day:"Пт",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка"]}],
+                            3:[{day:"Пн",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык"]},{day:"Вт",subs:["Русский язык","Математика","Литературное чтение","Музыка","ИЗО"]},{day:"Ср",subs:["Русский язык","Математика","Английский язык","Окружающий мир","Технология"]},{day:"Чт",subs:["Русский язык","Математика","Литературное чтение","Физкультура","ИЗО"]},{day:"Пт",subs:["Русский язык","Математика","Литературное чтение","Английский язык","Физкультура"]}],
+                            4:[{day:"Пн",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир","Английский язык"]},{day:"Вт",subs:["Русский язык","Математика","Литературное чтение","Музыка","ИЗО","Физкультура"]},{day:"Ср",subs:["Русский язык","Математика","Английский язык","Окружающий мир","Технология"]},{day:"Чт",subs:["Русский язык","Математика","Литературное чтение","Физкультура","ИЗО"]},{day:"Пт",subs:["Русский язык","Математика","Литературное чтение","Английский язык","Окружающий мир"]}],
                             5:[{day:"Пн",subs:["Русский язык","Математика","История","Английский язык","Физкультура"]},{day:"Вт",subs:["Литература","Математика","Природоведение","ИЗО","Музыка"]},{day:"Ср",subs:["Русский язык","Математика","История","Английский язык","ОБЖ"]},{day:"Чт",subs:["Литература","Математика","Природоведение","Технология","Физкультура"]},{day:"Пт",subs:["Русский язык","Математика","Английский язык","История","ИЗО"]}],
                             6:[{day:"Пн",subs:["Русский язык","Математика","История","Английский язык","Физкультура"]},{day:"Вт",subs:["Литература","Математика","Биология","ИЗО","Музыка"]},{day:"Ср",subs:["Русский язык","Математика","География","Английский язык","ОБЖ"]},{day:"Чт",subs:["Литература","Математика","Биология","Технология","Физкультура"]},{day:"Пт",subs:["Русский язык","Математика","Английский язык","История","География"]}],
                             7:[{day:"Пн",subs:["Русский язык","Алгебра","История","Английский язык","Физкультура","Обществознание"]},{day:"Вт",subs:["Литература","Геометрия","Биология","Физика","Информатика"]},{day:"Ср",subs:["Русский язык","Алгебра","География","Английский язык","ОБЖ"]},{day:"Чт",subs:["Литература","Геометрия","Физика","Технология","Физкультура"]},{day:"Пт",subs:["Русский язык","Алгебра","Английский язык","История","Биология"]}],
@@ -1255,7 +881,7 @@ export default function App(){
                             10:[{day:"Пн",subs:["Русский язык","Алгебра и начала анализа","Физика","История","Английский язык","Физкультура"]},{day:"Вт",subs:["Литература","Геометрия","Химия","Обществознание","Информатика","Астрономия"]},{day:"Ср",subs:["Русский язык","Алгебра и начала анализа","Биология","ОБЖ","Английский язык"]},{day:"Чт",subs:["Литература","Геометрия","Физика","История","Физкультура"]},{day:"Пт",subs:["Русский язык","Алгебра и начала анализа","Химия","Биология","Английский язык"]}],
                             11:[{day:"Пн",subs:["Русский язык","Алгебра и начала анализа","Физика","История","Английский язык","Физкультура"]},{day:"Вт",subs:["Литература","Геометрия","Химия","Обществознание","Информатика"]},{day:"Ср",subs:["Русский язык","Алгебра и начала анализа","Биология","ОБЖ","Английский язык"]},{day:"Чт",subs:["Литература","Геометрия","Физика","История","Физкультура"]},{day:"Пт",subs:["Русский язык","Алгебра и начала анализа","Химия","Биология","Английский язык"]}],
                           };
-                          const g=Math.min(Math.max(grade,5),11);
+                          const g=Math.min(Math.max(grade,1),11);
                           const plan=schedByGrade[g]||schedByGrade[8];
                           let ns=[...subjects];let nt=[...weeklyTemplate];
                           plan.forEach(({day,subs})=>{subs.forEach((name,i)=>{
@@ -1263,13 +889,13 @@ export default function App(){
                             if(!s){s={id:uid(),name,c:ns.length%SC.length};ns.push(s);}
                             nt.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
                           });});
-                          save({...dbData,subjects:ns,weeklyTemplate:nt});
+                          upd({subjects:ns,weeklyTemplate:nt});
                         }} className="mt-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 hover:bg-emerald-100 transition-all">
                           ✨ Заполнить расписание
                         </button>
                       )}
                     </div>
-                      <button onClick={()=>remChild(ch.id)} className="text-slate-300 hover:text-red-400 text-lg">×</button>
+                      <button onClick={()=>{setPendingRemoveId(ch.id);setShowRemoveChild(true);}} className="text-slate-300 hover:text-red-400 text-lg">×</button>
                     </div>
                   </Card>
                 ))}
@@ -1304,7 +930,7 @@ export default function App(){
               {showDanger&&(
                 <div className="mt-3">
                   <p className="text-xs text-slate-400 mb-3">Удаление семьи сотрёт все данные безвозвратно.</p>
-                  <button onClick={deleteFamily} className="w-full bg-red-50 text-red-500 border border-red-200 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-100 transition-all">
+                  <button onClick={()=>setShowDeleteFamilyConfirm(true)} className="w-full bg-red-50 text-red-500 border border-red-200 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-100 transition-all">
                     🗑 Удалить семью и все данные
                   </button>
                 </div>
@@ -1312,6 +938,37 @@ export default function App(){
             </Card>
           </div>
         )}
+
+        {/* Модал удаления семьи */}
+        {showDeleteFamilyConfirm&&(
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={()=>setShowDeleteFamilyConfirm(false)}>
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e=>e.stopPropagation()}>
+              <p className="text-lg font-bold text-slate-800 mb-2">Удалить семью?</p>
+              <p className="text-sm text-slate-500 mb-5">Все данные — расписание, задания, оценки — будут удалены безвозвратно.</p>
+              <div className="flex gap-3">
+                <button onClick={()=>setShowDeleteFamilyConfirm(false)} className="flex-1 bg-slate-100 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-200">Отмена</button>
+                <button onClick={deleteFamily} className="flex-1 bg-red-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-600">Удалить</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модал удаления ребёнка */}
+        {showRemoveChild&&pendingRemoveId&&(()=>{
+          const ch=children.find(c=>c.id===pendingRemoveId);
+          return(
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={()=>{setShowRemoveChild(false);setPendingRemoveId(null);}}>
+              <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e=>e.stopPropagation()}>
+                <p className="text-lg font-bold text-slate-800 mb-2">Удалить профиль {ch?.name}?</p>
+                <p className="text-sm text-slate-500 mb-5">Все задания, оценки и расписание этого ребёнка будут удалены.</p>
+                <div className="flex gap-3">
+                  <button onClick={()=>{setShowRemoveChild(false);setPendingRemoveId(null);}} className="flex-1 bg-slate-100 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-200">Отмена</button>
+                  <button onClick={()=>remChild(pendingRemoveId)} className="flex-1 bg-red-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-600">Удалить</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </div>
