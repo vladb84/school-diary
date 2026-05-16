@@ -130,6 +130,7 @@ export default function App(){
   const [showDeleteFamilyConfirm,setShowDeleteFamilyConfirm]=useState(false);
   const [showRemoveChild,setShowRemoveChild]=useState(false);
   const [pendingRemoveId,setPendingRemoveId]=useState(null);
+  const [previewChild,setPreviewChild]=useState(false);
 
   useEffect(()=>{
     getRedirectResult(auth).then(result=>{
@@ -387,7 +388,8 @@ export default function App(){
   if(!dbData)return <Loader text="Загрузка данных семьи..."/>;
 
   const{children,subjects,weeklyTemplate,dateSchedule,homework,grades,clubs}=dbData;
-  const isOwner=userRec?.role==="owner";
+  const realOwner=userRec?.role==="owner";
+  const isOwner=realOwner&&!previewChild;
   const cbg=idx=>CBG[(idx||0)%CBG.length];
   const subj=id=>subjects.find(s=>s.id===id);
   const sc=s=>s?SC[s.c%SC.length]:"bg-slate-100 text-slate-600";
@@ -543,7 +545,7 @@ export default function App(){
       <div className="max-w-2xl mx-auto p-4" onClick={e=>e.stopPropagation()}>
 
         <div className="flex items-center gap-2 mb-4">
-          <button onClick={()=>{setStep("select");setExpandedGradeId(null);setSelSubj(null);}} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
+          <button onClick={()=>{setStep("select");setExpandedGradeId(null);setSelSubj(null);setPreviewChild(false);}} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
           {isOwner
             ?<div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
               {children.map(ch=>(
@@ -558,8 +560,10 @@ export default function App(){
             :<div className="flex items-center gap-2 flex-1">
               {activeCh&&<div className={`w-8 h-8 rounded-full ${cbg(activeCh.colorIdx)} flex items-center justify-center text-white font-bold text-sm`}>{(activeCh.name?.[0]??"?")}</div>}
               <span className="font-semibold text-slate-700">{activeCh?.name||"Дневник"}</span>
+              {previewChild&&<span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">вид ребёнка</span>}
             </div>
           }
+          {realOwner&&<button onClick={()=>{setPreviewChild(v=>!v);setTab(0);}} title={previewChild?"Вернуться в режим родителя":"Посмотреть глазами ребёнка"} className={`flex-shrink-0 text-lg w-9 h-9 flex items-center justify-center rounded-xl transition-all ${previewChild?"bg-purple-500 text-white shadow":"bg-white text-slate-400 hover:text-purple-500 hover:bg-purple-50"}`}>👁</button>}
         </div>
 
         <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
