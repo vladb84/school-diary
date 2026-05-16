@@ -850,10 +850,18 @@ export default function App(){
                 {children.length===0?(
                   <div className="space-y-2 px-1 py-2">
                     <p className="text-sm text-slate-400 text-center mb-2">Добавьте первого ребёнка</p>
-                    <Inp cls="w-full" placeholder="Имя (Артём, Соня...)"
-                      value={newChild.name}
-                      onChange={e=>setNewChild(p=>({...p,name:e.target.value}))}
-                      onKeyDown={e=>e.key==='Enter'&&addChild()}/>
+                    <div className="flex gap-2">
+                      <Inp cls="flex-1" placeholder="Имя"
+                        value={newChild.name}
+                        onChange={e=>setNewChild(p=>({...p,name:e.target.value}))}
+                        onKeyDown={e=>e.key==='Enter'&&addChild()}/>
+                      <Inp cls="w-24" placeholder="с 2017" type="number"
+                        value={newChild.schoolYear}
+                        onChange={e=>setNewChild(p=>({...p,schoolYear:e.target.value}))}/>
+                      {(()=>{const sy=parseInt(newChild.schoolYear);return sy&&!isNaN(sy)&&sy<=new Date().getFullYear()&&(
+                        <div className="flex items-center px-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-600 whitespace-nowrap">{new Date().getFullYear()-sy+1} кл.</div>
+                      );})()}
+                    </div>
                     <Btn onClick={addChild} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
                   </div>
                 )
