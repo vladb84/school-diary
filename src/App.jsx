@@ -859,7 +859,7 @@ export default function App(){
                       <Inp cls="w-24" placeholder="с 2017" type="number"
                         value={newChild.schoolYear}
                         onChange={e=>setNewChild(p=>({...p,schoolYear:e.target.value}))}/>
-                      {(()=>{const sy=parseInt(newChild.schoolYear);return sy&&!isNaN(sy)&&sy<=new Date().getFullYear()&&(
+                      {(()=>{const sy=parseInt(newChild.schoolYear);if(!sy||isNaN(sy)||sy>new Date().getFullYear())return null;return(
                         <div className="flex items-center px-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-600 whitespace-nowrap">{new Date().getFullYear()-sy+1} кл.</div>
                       );})()}
                     </div>
