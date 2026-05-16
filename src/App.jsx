@@ -921,7 +921,7 @@ export default function App(){
                           </button>
                         </div>
                       {weeklyTemplate.filter(l=>l.childId===ch.id).length===0&&(
-                        <button onClick={()=>{
+                        <button onClick={e=>{e.stopPropagation();
                           const grade=ch.grade;
                           if(!grade){alert("У ребёнка не указан класс. Укажи год поступления.");return;}
                           const schedByGrade={
