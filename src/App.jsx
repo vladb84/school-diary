@@ -886,7 +886,7 @@ export default function App(){
                               onChange={e=>setEditChildF(p=>({...p,schoolYear:e.target.value}))}/>
                           </div>
                         </div>
-                        {(()=>{const sy=parseInt(editChildF.schoolYear??ch.schoolYear);return sy&&sy<=new Date().getFullYear()&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎒 Текущий класс: <b>{new Date().getFullYear()-sy+1}</b></p>;})()}
+                        {(()=>{const raw=editChildF.schoolYear??ch.schoolYear;const sy=parseInt(raw);return raw&&!isNaN(sy)&&sy<=new Date().getFullYear()&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎒 Текущий класс: <b>{new Date().getFullYear()-sy+1}</b></p>;})()}
                         <div className="flex gap-2">
                           <Btn onClick={()=>{
                             const name=(editChildF.name??ch.name).trim();
