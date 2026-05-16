@@ -861,7 +861,14 @@ export default function App(){
                   <Card key={ch.id}>
                     {editChildId===ch.id?(
                       <div className="space-y-2">
-                        <p className="text-xs text-slate-400 font-medium mb-1">Редактировать ребёнка</p>
+                        <div className="flex items-center gap-3 cursor-pointer mb-2" onClick={()=>{setEditChildId(null);setEditChildF({});}}>
+                          <div className={`w-10 h-10 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-lg font-bold flex-shrink-0`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-700">{ch.name}</p>
+                            <p className="text-xs text-slate-400">Нажми, чтобы свернуть</p>
+                          </div>
+                          <span className="text-slate-300 text-lg">∧</span>
+                        </div>
                         <Inp cls="w-full" placeholder="Имя (Артём, Соня...)"
                           value={editChildF.name??ch.name}
                           onChange={e=>setEditChildF(p=>({...p,name:e.target.value}))}/>
