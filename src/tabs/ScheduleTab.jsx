@@ -63,6 +63,8 @@ export default function ScheduleTab({
   };
 
   const doCancel = (l) => {
+    const existing=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);
+    if(existing)return collapseSubstitution();
     upd({dateSchedule:[...(dateSchedule||[]),{
       id:uid(),childId,date:activeDate,
       subjectId:null,lessonNum:l.lessonNum,time:'',
@@ -73,6 +75,8 @@ export default function ScheduleTab({
 
   const doReplace = (l) => {
     if(!subReplaceSubj)return;
+    const existing=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);
+    if(existing)return collapseSubstitution();
     let sid=subReplaceSubj,ns=subjects;
     if(subReplaceSubj.startsWith("__new__")){
       const r=resolveOrCreateSubject(subReplaceSubj.replace("__new__",""));
@@ -88,6 +92,8 @@ export default function ScheduleTab({
 
   const doMove = (l) => {
     if(!subMoveSlot)return;
+    const existing=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);
+    if(existing)return collapseSubstitution();
     upd({dateSchedule:[...(dateSchedule||[]),{
       id:uid(),childId,date:activeDate,
       subjectId:l.subjectId,lessonNum:+subMoveSlot,
@@ -229,9 +235,9 @@ export default function ScheduleTab({
                             <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{background:dotColor,opacity:isCancelled?0.35:1}}/>
                           </div>
                           <div
-                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm p-3 ${isOwner&&!isCancelled?'cursor-pointer':''} ${isCancelled?'opacity-45':''}`}
+                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm p-3 ${isOwner?'cursor-pointer':''} ${isCancelled?'opacity-45':''}`}
                             onClick={()=>{
-                              if(!isOwner||isCancelled)return;
+                              if(!isOwner)return;
                               if(isExpanded){collapseSubstitution();}
                               else{setExpandedLesson(l.id);setSubAction(null);setSubReplaceSubj('');setSubMoveSlot('');}
                             }}>
@@ -240,7 +246,6 @@ export default function ScheduleTab({
                                 {l.lessonNum>0&&<span className="text-xs text-slate-300 font-bold w-4 text-center">{l.lessonNum}</span>}
                                 <span className="text-sm font-medium text-slate-400 line-through flex-1">{s?.name||"?"}</span>
                                 <span className="text-xs bg-red-50 text-red-400 border border-red-200 rounded-full px-2 py-0.5">отменён</span>
-                                {isOwner&&<button onClick={e=>{e.stopPropagation();const ce=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);if(ce)doUndo(ce);}} className="text-slate-300 hover:text-blue-400 text-xs ml-auto px-2 py-0.5 border border-slate-200 rounded-lg">↩</button>}
                               </div>
                             ):isReplace?(
                               <div className="flex items-center gap-1 flex-wrap">
@@ -336,6 +341,14 @@ export default function ScheduleTab({
                             {isOwner&&isExpanded&&isSubstitution&&(
                               <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
                                 <button onClick={()=>doUndo(l)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
+                                  ↩ Восстановить
+                                </button>
+                              </div>
+                            )}
+                            {isOwner&&isExpanded&&isCancelled&&(
+                              <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                                <button onClick={()=>{const ce=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);if(ce)doUndo(ce);}}
                                   className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
                                   ↩ Восстановить
                                 </button>
