@@ -135,7 +135,12 @@ export default function ScheduleTab({
       </div>
       <Card cls="mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-700">{DAYS_FULL[activeDayIdx]}, {sd(activeDate).getDate()} {MON[sd(activeDate).getMonth()]}</h2>
+          <h2 className="font-semibold text-slate-700 flex items-center gap-2">
+            {DAYS_FULL[activeDayIdx]}, {sd(activeDate).getDate()} {MON[sd(activeDate).getMonth()]}
+            {(dateSchedule||[]).some(l=>l.childId===childId&&l.date===activeDate&&l.cancelsSlot!=null)&&(
+              <span className="inline-block w-2 h-2 rounded-full bg-red-400 flex-shrink-0" title="Есть изменения в расписании"/>
+            )}
+          </h2>
           <div className="flex items-center gap-2">
             {activeDate===todayStr&&<span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Сегодня</span>}
             {isSunday&&<span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Выходной</span>}
@@ -174,16 +179,33 @@ export default function ScheduleTab({
                   <div className="absolute left-14 top-0 bottom-0 w-0.5 bg-slate-200"/>
                   {sortedLessons.map((l,idx)=>{
                     const s=subj(l.subjectId);
-                    const isOnce=!!l.date;
-                    const lGr=sjGrades(l.subjectId).slice(0,1);
+                    const isCancelled=!!l._cancelled;
+                    const isReplace=l.type==='replace';
+                    const isMove=l.type==='move';
+                    const isExtra=!!l.date&&!l.cancelsSlot&&(!l.type||l.type==='extra');
+                    const isSubstitution=isReplace||isMove||isExtra;
+                    const isExpanded=expandedLesson===l.id;
+                    const lGr=sjGrades(l.subjectId||'').slice(0,1);
                     const pendHw=chHw.filter(h=>h.subjectId===l.subjectId&&!h.done);
                     const hasKR=pendHw.some(h=>h.hwType==="kr");
-                    const dotColor=DOT_COLORS[(s?.c||0)%DOT_COLORS.length];
+                    const dotColor=isCancelled?'#cbd5e1':DOT_COLORS[((s?.c)||0)%DOT_COLORS.length];
                     const prevLesson=idx>0?sortedLessons[idx-1]:null;
                     const hasGap=prevLesson&&l.lessonNum&&prevLesson.lessonNum&&(+l.lessonNum-(+prevLesson.lessonNum))>1;
                     const hwChips=(homework||[]).filter(h=>h.subjectId===l.subjectId&&h.date===activeDate);
                     const showQuickForm=hwQuickForm?.subjectId===l.subjectId&&hwQuickForm?.date===activeDate;
                     const gapSize=hasGap?(+l.lessonNum-(+prevLesson.lessonNum)-1):0;
+                    const origLesson=(isReplace||isMove)&&l.cancelsSlot
+                      ?chTpl.find(t=>t.day===activeDay&&+t.lessonNum===+l.cancelsSlot)
+                      :null;
+                    const origSubj=origLesson?subj(origLesson.subjectId):null;
+                    const origTime=isMove?lessonTimeFor(l.cancelsSlot,shift):null;
+                    const takenSlots=new Set(
+                      activeLessons
+                        .filter(x=>x.id!==l.id&&!x._cancelled)
+                        .map(x=>+x.lessonNum)
+                        .filter(n=>n>0)
+                    );
+                    const freeSlots=[1,2,3,4,5,6,7].filter(n=>!takenSlots.has(n));
                     return(
                       <div key={l.id}>
                         {hasGap&&(
@@ -200,33 +222,126 @@ export default function ScheduleTab({
                           </div>
                         )}
                         <div className="relative flex items-start mb-4">
-                          <div className="w-12 text-right pr-2 pt-2 text-xs text-slate-400 flex-shrink-0">
+                          <div className={`w-12 text-right pr-2 pt-2 text-xs flex-shrink-0 ${isCancelled?'text-slate-300':'text-slate-400'}`}>
                             {lessonTimeFor(l.lessonNum,shift)}
                           </div>
                           <div className="flex items-center justify-center w-5 flex-shrink-0 pt-3 z-10">
-                            <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{background:dotColor}}/>
+                            <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{background:dotColor,opacity:isCancelled?0.35:1}}/>
                           </div>
-                          <div className="flex-1 ml-3 bg-white rounded-xl shadow-sm p-3">
-                            {/* Row 1: lesson info */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
-                              <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600 min-w-0"
-                                onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}}>
-                                {s?.name||"?"}
-                              </span>
-                              {isOnce&&<span className="text-purple-400 text-xs">📌</span>}
-                              {hasKR?<span className="text-red-500 text-xs">🚨</span>:pendHw.length>0?<span className="text-orange-400 text-xs">📝</span>:null}
-                              {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
-                              {isOwner&&(
-                                <button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");}}
-                                  className="text-slate-400 hover:text-blue-500 text-xs px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">
-                                  +📝
+                          <div
+                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm p-3 ${isOwner&&!isCancelled?'cursor-pointer':''} ${isCancelled?'opacity-45':''}`}
+                            onClick={()=>{
+                              if(!isOwner||isCancelled)return;
+                              if(isExpanded){collapseSubstitution();}
+                              else{setExpandedLesson(l.id);setSubAction(null);setSubReplaceSubj('');setSubMoveSlot('');}
+                            }}>
+                            {isCancelled?(
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {l.lessonNum>0&&<span className="text-xs text-slate-300 font-bold w-4 text-center">{l.lessonNum}</span>}
+                                <span className="text-sm font-medium text-slate-400 line-through flex-1">{s?.name||"?"}</span>
+                                <span className="text-xs bg-red-50 text-red-400 border border-red-200 rounded-full px-2 py-0.5">отменён</span>
+                                {isOwner&&<button onClick={e=>{e.stopPropagation();const ce=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);if(ce)doUndo(ce);}} className="text-slate-300 hover:text-blue-400 text-xs ml-auto px-2 py-0.5 border border-slate-200 rounded-lg">↩</button>}
+                              </div>
+                            ):isReplace?(
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
+                                <span className="text-xs text-slate-400 line-through">{origSubj?.name||"?"}</span>
+                                <span className="text-slate-300 text-xs">→</span>
+                                <span className="text-sm font-medium text-slate-700 flex-1">{s?.name||"?"}</span>
+                                <span className="text-xs bg-green-50 text-green-600 border border-green-200 rounded-full px-2 py-0.5">замена</span>
+                              </div>
+                            ):isMove?(
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
+                                <span className="text-xs text-slate-400 line-through">{origTime}</span>
+                                <span className="text-slate-300 text-xs">→</span>
+                                <span className="text-sm font-medium text-slate-700 flex-1">{s?.name||"?"}</span>
+                                <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-full px-2 py-0.5">перенос</span>
+                              </div>
+                            ):isExtra?(
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
+                                <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600" onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}}>{s?.name||"?"}</span>
+                                <span className="text-xs bg-orange-50 text-orange-500 border border-orange-200 rounded-full px-2 py-0.5">разовый</span>
+                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)});}} className="text-slate-300 hover:text-red-400 text-lg ml-1">×</button>}
+                              </div>
+                            ):(
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
+                                <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600 min-w-0"
+                                  onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}}>
+                                  {s?.name||"?"}
+                                </span>
+                                {hasKR?<span className="text-red-500 text-xs">🚨</span>:pendHw.length>0?<span className="text-orange-400 text-xs">📝</span>:null}
+                                {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
+                                {isOwner&&(
+                                  <button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");}}
+                                    className="text-slate-400 hover:text-blue-500 text-xs px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">
+                                    +📝
+                                  </button>
+                                )}
+                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
+                              </div>
+                            )}
+                            {isOwner&&isExpanded&&!isCancelled&&!isSubstitution&&(
+                              <div className="mt-2 pt-2 border-t border-slate-100">
+                                {subAction===null&&(
+                                  <div className="flex gap-1.5 flex-wrap">
+                                    <button onClick={e=>{e.stopPropagation();doCancel(l);}}
+                                      className="text-xs px-2.5 py-1 rounded-full border border-red-200 bg-red-50 text-red-500 hover:bg-red-100">
+                                      🚫 Отменить
+                                    </button>
+                                    <button onClick={e=>{e.stopPropagation();setSubAction('replace');}}
+                                      className="text-xs px-2.5 py-1 rounded-full border border-green-200 bg-green-50 text-green-600 hover:bg-green-100">
+                                      🔄 Заменить
+                                    </button>
+                                    <button onClick={e=>{e.stopPropagation();setSubAction('move');}}
+                                      className="text-xs px-2.5 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">
+                                      ⏱ Перенести
+                                    </button>
+                                  </div>
+                                )}
+                                {subAction==='replace'&&(
+                                  <div className="flex gap-2 items-center" onClick={e=>e.stopPropagation()}>
+                                    <select
+                                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                      value={subReplaceSubj}
+                                      onChange={e=>setSubReplaceSubj(e.target.value)}>
+                                      <option value="">Выберите предмет...</option>
+                                      {availSubjNames.map(name=>{const sx=subjects.find(x=>x.name===name);return <option key={name} value={sx?.id||"__new__"+name}>{name}</option>;})}
+                                    </select>
+                                    <button onClick={()=>doReplace(l)}
+                                      className="bg-green-500 text-white rounded-lg px-3 py-1.5 text-sm">✓</button>
+                                    <button onClick={e=>{e.stopPropagation();setSubAction(null);}}
+                                      className="text-slate-400 text-sm px-2">×</button>
+                                  </div>
+                                )}
+                                {subAction==='move'&&(
+                                  <div className="flex gap-2 items-center" onClick={e=>e.stopPropagation()}>
+                                    <select
+                                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                      value={subMoveSlot}
+                                      onChange={e=>setSubMoveSlot(e.target.value)}>
+                                      <option value="">Выберите слот...</option>
+                                      {freeSlots.map(n=><option key={n} value={n}>{n} — {lessonTimeFor(n,shift)}</option>)}
+                                    </select>
+                                    <button onClick={()=>doMove(l)}
+                                      className="bg-blue-500 text-white rounded-lg px-3 py-1.5 text-sm">✓</button>
+                                    <button onClick={e=>{e.stopPropagation();setSubAction(null);}}
+                                      className="text-slate-400 text-sm px-2">×</button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {isOwner&&isExpanded&&isSubstitution&&(
+                              <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                                <button onClick={()=>doUndo(l)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
+                                  ↩ Восстановить
                                 </button>
-                              )}
-                              {isOwner&&<button onClick={e=>{e.stopPropagation();isOnce?upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)}):upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)});}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
-                            </div>
-                            {/* Row 2: HW chips */}
-                            {hwChips.length>0&&(
+                              </div>
+                            )}
+                            {!isCancelled&&hwChips.length>0&&(
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {hwChips.map(hw=>(
                                   <div key={hw.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${hw.done?"bg-green-50 border-green-200 text-green-700 line-through":"bg-blue-50 border-blue-200 text-blue-700"}`}>
@@ -236,8 +351,7 @@ export default function ScheduleTab({
                                 ))}
                               </div>
                             )}
-                            {/* Row 3: Quick HW form */}
-                            {showQuickForm&&(
+                            {!isCancelled&&showQuickForm&&(
                               <div className="mt-2 flex gap-2">
                                 <input autoFocus
                                   className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
