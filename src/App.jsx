@@ -112,6 +112,8 @@ export default function App(){
   const [showAddClub,setShowAddClub]=useState(false);
   const [showAddSubj,setShowAddSubj]=useState(false);
   const [showAddChild,setShowAddChild]=useState(false);
+  const [editChildId,setEditChildId]=useState(null);
+  const [editChildF,setEditChildF]=useState({});
   const [showDanger,setShowDanger]=useState(false);
   const [showFamilyCode,setShowFamilyCode]=useState(false);
   const [showSubjList,setShowSubjList]=useState(true);
@@ -857,13 +859,51 @@ export default function App(){
                 )
                   :children.map(ch=>(
                   <Card key={ch.id}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
-                      <div className="flex-1">
+                    {editChildId===ch.id?(
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-400 font-medium mb-1">Редактировать ребёнка</p>
+                        <Inp cls="w-full" placeholder="Имя (Артём, Соня...)"
+                          value={editChildF.name??ch.name}
+                          onChange={e=>setEditChildF(p=>({...p,name:e.target.value}))}/>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <label className="text-xs text-slate-400 mb-1 block">Год рождения</label>
+                            <Inp cls="w-full" placeholder="2010" type="number"
+                              value={editChildF.birthYear??ch.birthYear??''}
+                              onChange={e=>setEditChildF(p=>({...p,birthYear:e.target.value}))}/>
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-xs text-slate-400 mb-1 block">Год поступления в школу</label>
+                            <Inp cls="w-full" placeholder="2017" type="number"
+                              value={editChildF.schoolYear??ch.schoolYear??''}
+                              onChange={e=>setEditChildF(p=>({...p,schoolYear:e.target.value}))}/>
+                          </div>
+                        </div>
+                        {(()=>{const sy=parseInt(editChildF.schoolYear??ch.schoolYear);return sy&&sy<=new Date().getFullYear()&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎒 Текущий класс: <b>{new Date().getFullYear()-sy+1}</b></p>;})()}
+                        <div className="flex gap-2">
+                          <Btn onClick={()=>{
+                            const name=(editChildF.name??ch.name).trim();
+                            if(!name)return;
+                            const by=parseInt(editChildF.birthYear??ch.birthYear)||null;
+                            const sy=parseInt(editChildF.schoolYear??ch.schoolYear)||null;
+                            const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
+                            let ns=[...subjects];
+                            if(grade&&!ch.grade)(gradeSubjects(grade)||[]).forEach(n=>{if(!ns.find(s=>s.name===n))ns.push({id:uid(),name:n,c:ns.length%SC.length});});
+                            upd({subjects:ns,children:children.map(x=>x.id===ch.id?{...x,name,birthYear:by,schoolYear:sy,grade}:x)});
+                            setEditChildId(null);setEditChildF({});
+                          }} cls="flex-1 bg-blue-500 text-white hover:bg-blue-600">Сохранить</Btn>
+                          <Btn onClick={()=>{setEditChildId(null);setEditChildF({});}} cls="bg-slate-100 text-slate-600 hover:bg-slate-200">Отмена</Btn>
+                        </div>
+                      </div>
+                    ):(
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={()=>{setEditChildId(ch.id);setEditChildF({});}}>
+                      <div className={`w-12 h-12 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-xl font-bold flex-shrink-0`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
+                      <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-700">{ch.name}</p>
-                        <p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р.`}{ch.birthYear&&ch.grade?" · ":""}{ch.grade&&`${ch.grade} класс`}</p>
+                        {ch.grade?<p className="text-xs text-slate-500">{ch.birthYear&&`${ch.birthYear} г.р. · `}{ch.grade} класс</p>
+                          :<p className="text-xs text-amber-500">⚠️ Укажи год поступления</p>}
                         <p className="text-xs text-slate-400">{weeklyTemplate.filter(l=>l.childId===ch.id).length} ур/нед · {homework.filter(h=>h.childId===ch.id).length} заданий</p>
-                        <div className="flex gap-1 mt-1.5">
+                        <div className="flex gap-1 mt-1.5" onClick={e=>e.stopPropagation()}>
                           <button onClick={()=>upd({children:children.map(x=>x.id===ch.id?{...x,shift:1}:x)})}
                             className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${(ch.shift||1)===1?"bg-blue-500 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                             I смена
@@ -904,8 +944,9 @@ export default function App(){
                         </button>
                       )}
                     </div>
-                      <button onClick={()=>{setPendingRemoveId(ch.id);setShowRemoveChild(true);}} className="text-slate-300 hover:text-red-400 text-lg">×</button>
+                      <button onClick={e=>{e.stopPropagation();setPendingRemoveId(ch.id);setShowRemoveChild(true);}} className="text-slate-300 hover:text-red-400 text-lg flex-shrink-0">×</button>
                     </div>
+                    )}
                   </Card>
                 ))}
               </div>
