@@ -845,7 +845,16 @@ export default function App(){
             <div className="mb-4 border-2 border-blue-200 rounded-2xl p-2 bg-blue-50/40">
               <p className="text-xs text-blue-400 font-medium px-2 pt-1 pb-2">Дети</p>
               <div className="space-y-2">
-                {children.length===0?<Empty txt="Детей нет — добавьте первого"/>
+                {children.length===0?(
+                  <div className="space-y-2 px-1 py-2">
+                    <p className="text-sm text-slate-400 text-center mb-2">Добавьте первого ребёнка</p>
+                    <Inp cls="w-full" placeholder="Имя (Артём, Соня...)"
+                      value={newChild.name}
+                      onChange={e=>setNewChild(p=>({...p,name:e.target.value}))}
+                      onKeyDown={e=>e.key==='Enter'&&addChild()}/>
+                    <Btn onClick={addChild} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
+                  </div>
+                )
                   :children.map(ch=>(
                   <Card key={ch.id}>
                     <div className="flex items-center gap-3">
