@@ -517,9 +517,9 @@ export default function App(){
     setPendingRemoveId(null);
   };
 
+  const calcGrade=ch=>{if(!ch)return null;const g=Number(ch.grade);if(g>0)return g;const sy=parseInt(ch.schoolYear);return(!isNaN(sy)&&sy>0&&sy<=new Date().getFullYear())?new Date().getFullYear()-sy+1:null;};
   const seedSchedule=()=>{
-    const sy=parseInt(activeCh?.schoolYear);
-    const grade=activeCh?.grade||(sy&&!isNaN(sy)&&sy<=new Date().getFullYear()?new Date().getFullYear()-sy+1:null);
+    const grade=calcGrade(activeCh);
     if(!grade)return alert("У ребёнка не указан класс. Укажи год поступления в разделе Семья.");
     const scheduleByGrade={
       1:[
