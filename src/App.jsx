@@ -692,7 +692,7 @@ export default function App(){
         {tab===5&&isOwner&&(
           <div>
             <Card cls="mb-4">
-              <CollapseBtn open={showSubjList} onToggle={()=>setShowSubjList(v=>!v)} label={`Предметы ${activeCh?.name||""}${activeCh?.grade?` · ${activeCh.grade} класс`:""}`}/>
+              <CollapseBtn open={showSubjList} onToggle={()=>setShowSubjList(v=>!v)} label={`Предметы ${activeCh?.name||""}${activeCh?.grade?` · ${activeCh.grade} класс`:""}${chTpl.length>0?` · ${chTpl.length} ур/нед`:""}`}/>
               {showSubjList&&(()=>{
                 const gradeSubjNames=gradeSubjects(activeCh?.grade)||[];
                 const allSubjNames=[...new Set([...gradeSubjNames,...schSubjs.map(s=>s.name)])];
