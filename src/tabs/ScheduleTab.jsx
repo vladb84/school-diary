@@ -236,7 +236,7 @@ export default function ScheduleTab({
                             <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{background:dotColor,opacity:isCancelled?0.35:1}}/>
                           </div>
                           <div
-                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm p-3 ${isOwner&&!isMovedAway?'cursor-pointer':''} ${(isCancelled||isMovedAway)?'opacity-45':''}`}
+                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm px-3 py-4 ${isOwner&&!isMovedAway?'cursor-pointer':''} ${(isCancelled||isMovedAway)?'opacity-45':''}`}
                             onClick={()=>{
                               if(!isOwner||isMovedAway)return;
                               if(isExpanded){collapseSubstitution();}
