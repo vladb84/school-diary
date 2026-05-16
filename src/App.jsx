@@ -211,13 +211,13 @@ export default function App(){
           return l;
         })
         .filter(Boolean);
-      const addedEntries=dateEntries.filter(l=>l.subjectId);
+      const addedEntries=dateEntries.filter(l=>l.subjectId&&l.type!=='cancel');
       const result=[...tplLessons,...addedEntries]
         .sort((a,b)=>(+a.lessonNum||99)-(+b.lessonNum||99));
       cache[dateStr]=result;
       return result;
     };
-  },[chTpl,dbData?.dateSchedule,childId]);
+  },[dbData?.weeklyTemplate,dbData?.dateSchedule,childId]);
 
   const sjGrades=useMemo(()=>{
     const cache={};
