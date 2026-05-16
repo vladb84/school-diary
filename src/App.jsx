@@ -518,8 +518,9 @@ export default function App(){
   };
 
   const seedSchedule=()=>{
-    if(!activeCh?.grade)return alert("У ребёнка не указан класс. Укажи год поступления в разделе Семья.");
-    const grade=activeCh.grade;
+    const sy=parseInt(activeCh?.schoolYear);
+    const grade=activeCh?.grade||(sy&&!isNaN(sy)&&sy<=new Date().getFullYear()?new Date().getFullYear()-sy+1:null);
+    if(!grade)return alert("У ребёнка не указан класс. Укажи год поступления в разделе Семья.");
     const scheduleByGrade={
       1:[
         {day:"Пн",subjects:["Русский язык","Математика","Литературное чтение","Окружающий мир"]},
@@ -930,7 +931,8 @@ export default function App(){
                         </div>
                       {weeklyTemplate.filter(l=>l.childId===ch.id).length===0&&(
                         <button onClick={e=>{e.stopPropagation();
-                          const grade=ch.grade;
+                          const sy=parseInt(ch.schoolYear);
+                          const grade=ch.grade||(sy&&!isNaN(sy)&&sy<=new Date().getFullYear()?new Date().getFullYear()-sy+1:null);
                           if(!grade){setEditChildId(ch.id);setEditChildF({});return;}
                           const schedByGrade={
                             1:[{day:"Пн",subs:["Русский язык","Математика","Литературное чтение","Окружающий мир"]},{day:"Вт",subs:["Русский язык","Математика","Литературное чтение","Музыка"]},{day:"Ср",subs:["Русский язык","Математика","Литературное чтение","ИЗО"]},{day:"Чт",subs:["Русский язык","Математика","Литературное чтение","Физкультура"]},{day:"Пт",subs:["Русский язык","Математика","Технология","Окружающий мир"]}],
