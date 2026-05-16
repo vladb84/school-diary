@@ -175,9 +175,7 @@ export default function App(){
   const setOrderAndSave=order=>{setStatsOrder(order);saveStatsPrefs(order,statsColl);};
   const setCollAndSave=coll=>{setStatsColl(coll);saveStatsPrefs(statsOrder,coll);};
 
-  const login=useCallback(()=>isMobile()
-    ?signInWithRedirect(auth,provider).catch(console.error)
-    :signInWithPopup(auth,provider).catch(console.error),[]);
+  const login=useCallback(()=>signInWithPopup(auth,provider).catch(console.error),[]);
 
   const logout=useCallback(async()=>{
     await signOut(auth);
