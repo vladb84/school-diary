@@ -35,6 +35,7 @@ export default function ScheduleTab({
   const [hwQuickForm, setHwQuickForm] = useState(null);
   const [hwQuickTask, setHwQuickTask] = useState("");
   const [expandedLesson, setExpandedLesson] = useState(null);
+  const [expandedSubjLesson, setExpandedSubjLesson] = useState(null);
   const [subAction, setSubAction] = useState(null);
   const [subReplaceSubj, setSubReplaceSubj] = useState('');
   const [subMoveSlot, setSubMoveSlot] = useState('');
@@ -239,6 +240,7 @@ export default function ScheduleTab({
                             className={`flex-1 ml-3 bg-white rounded-xl shadow-sm px-3 py-4 ${isOwner&&!isMovedAway?'cursor-pointer':''} ${(isCancelled||isMovedAway)?'opacity-45':''}`}
                             onClick={()=>{
                               if(!isOwner||isMovedAway)return;
+                              setExpandedSubjLesson(null);
                               if(isExpanded){collapseSubstitution();}
                               else{setExpandedLesson(l.id);setSubAction(null);setSubReplaceSubj('');setSubMoveSlot('');}
                             }}>
@@ -273,19 +275,26 @@ export default function ScheduleTab({
                             ):isExtra?(
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600" onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}}>{s?.name||"?"}</span>
+                                <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600"
+                                  onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
+                                  {s?.name||"?"}
+                                </span>
                                 <span className="text-xs bg-orange-50 text-orange-500 border border-orange-200 rounded-full px-2 py-0.5">разовый</span>
+                                <button onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}} title="Статистика"
+                                  className="text-slate-400 hover:text-blue-500 text-sm px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">📊</button>
                                 {isOwner&&<button onClick={e=>{e.stopPropagation();upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)});}} className="text-slate-300 hover:text-red-400 text-lg ml-1">×</button>}
                               </div>
                             ):(
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
                                 <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600 min-w-0"
-                                  onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}}>
+                                  onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
                                   {s?.name||"?"}
                                 </span>
                                 {hasKR?<span className="text-red-500 text-xs">🚨</span>:pendHw.length>0?<span className="text-orange-400 text-xs">📝</span>:null}
                                 {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
+                                <button onClick={e=>{e.stopPropagation();if(s){setSelSubj(s.id);setTab(3);}}} title="Статистика"
+                                  className="text-slate-400 hover:text-blue-500 text-sm px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">📊</button>
                                 {isOwner&&(
                                   <button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");}}
                                     className="text-slate-400 hover:text-blue-500 text-xs px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">
@@ -367,6 +376,25 @@ export default function ScheduleTab({
                                   className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
                                   ↩ Восстановить
                                 </button>
+                              </div>
+                            )}
+                            {expandedSubjLesson===l.id&&!isCancelled&&!isMovedAway&&(
+                              <div className="mt-3 pt-3 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{s?.name}</span>
+                                  <button onClick={()=>{if(s){setSelSubj(s.id);setTab(3);}}}
+                                    className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-full hover:bg-blue-100 transition-all">
+                                    📊 Статистика
+                                  </button>
+                                </div>
+                                {(()=>{
+                                  const recentGr=sjGrades(l.subjectId||'').slice(0,6);
+                                  if(recentGr.length===0)return <p className="text-xs text-slate-400">Оценок пока нет</p>;
+                                  return <div className="flex flex-wrap gap-1">{recentGr.map(g=><GBadge key={g.id} v={g.value} type={g.type}/>)}</div>;
+                                })()}
+                                {pendHw.length>0&&(
+                                  <p className="text-xs text-orange-500 mt-2">📝 {pendHw.length} невыполн. {pendHw.length===1?"задание":pendHw.length<5?"задания":"заданий"}</p>
+                                )}
                               </div>
                             )}
                             {!isCancelled&&hwChips.length>0&&(
