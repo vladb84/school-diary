@@ -186,6 +186,7 @@ export default function ScheduleTab({
                   {sortedLessons.map((l,idx)=>{
                     const s=subj(l.subjectId);
                     const isCancelled=!!l._cancelled;
+                    const isMovedAway=!!l._movedAway;
                     const isReplace=l.type==='replace';
                     const isMove=l.type==='move';
                     const isExtra=!!l.date&&!l.cancelsSlot&&(!l.type||l.type==='extra');
@@ -194,7 +195,7 @@ export default function ScheduleTab({
                     const lGr=sjGrades(l.subjectId||'').slice(0,1);
                     const pendHw=chHw.filter(h=>h.subjectId===l.subjectId&&!h.done);
                     const hasKR=pendHw.some(h=>h.hwType==="kr");
-                    const dotColor=isCancelled?'#cbd5e1':DOT_COLORS[((s?.c)||0)%DOT_COLORS.length];
+                    const dotColor=(isCancelled||isMovedAway)?'#cbd5e1':DOT_COLORS[((s?.c)||0)%DOT_COLORS.length];
                     const prevLesson=idx>0?sortedLessons[idx-1]:null;
                     const hasGap=prevLesson&&l.lessonNum&&prevLesson.lessonNum&&(+l.lessonNum-(+prevLesson.lessonNum))>1;
                     const hwChips=(homework||[]).filter(h=>h.subjectId===l.subjectId&&h.date===activeDate);
@@ -235,13 +236,19 @@ export default function ScheduleTab({
                             <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{background:dotColor,opacity:isCancelled?0.35:1}}/>
                           </div>
                           <div
-                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm p-3 ${isOwner?'cursor-pointer':''} ${isCancelled?'opacity-45':''}`}
+                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm p-3 ${isOwner&&!isMovedAway?'cursor-pointer':''} ${(isCancelled||isMovedAway)?'opacity-45':''}`}
                             onClick={()=>{
-                              if(!isOwner)return;
+                              if(!isOwner||isMovedAway)return;
                               if(isExpanded){collapseSubstitution();}
                               else{setExpandedLesson(l.id);setSubAction(null);setSubReplaceSubj('');setSubMoveSlot('');}
                             }}>
-                            {isCancelled?(
+                            {isMovedAway?(
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {l.lessonNum>0&&<span className="text-xs text-slate-300 font-bold w-4 text-center">{l.lessonNum}</span>}
+                                <span className="text-sm font-medium text-slate-400 line-through flex-1">{s?.name||"?"}</span>
+                                <span className="text-xs bg-blue-50 text-blue-400 border border-blue-200 rounded-full px-2 py-0.5">перенесён → {l._moveEntry?.lessonNum} ур.</span>
+                              </div>
+                            ):isCancelled?(
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {l.lessonNum>0&&<span className="text-xs text-slate-300 font-bold w-4 text-center">{l.lessonNum}</span>}
                                 <span className="text-sm font-medium text-slate-400 line-through flex-1">{s?.name||"?"}</span>
@@ -349,6 +356,14 @@ export default function ScheduleTab({
                             {isOwner&&isExpanded&&isCancelled&&(
                               <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
                                 <button onClick={()=>{const ce=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);if(ce)doUndo(ce);}}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
+                                  ↩ Восстановить
+                                </button>
+                              </div>
+                            )}
+                            {isMovedAway&&l._moveEntry&&isOwner&&(
+                              <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                                <button onClick={()=>doUndo(l._moveEntry)}
                                   className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
                                   ↩ Восстановить
                                 </button>

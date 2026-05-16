@@ -205,8 +205,10 @@ export default function App(){
         .map(l=>{
           if(cancelledSlots.has(l.lessonNum)){
             const entry=dateEntries.find(e=>e.cancelsSlot===l.lessonNum);
-            // 'cancel' type: keep as struck-through row; replace/move: drop (substitution row handles display)
-            return entry?.type==='cancel'?{...l,_cancelled:true}:null;
+            // 'cancel' → struck-through; 'move' → show source slot as "moved away"; 'replace' → drop (substitution row handles it)
+            if(entry?.type==='cancel')return{...l,_cancelled:true};
+            if(entry?.type==='move')return{...l,_movedAway:true,_moveEntry:entry};
+            return null;
           }
           return l;
         })
