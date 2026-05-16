@@ -435,7 +435,7 @@ export default function ScheduleTab({
                 let sid=lessonForm.subjectId,ns=subjects;
                 if(lessonForm.subjectId.startsWith("__new__")){const r=resolveOrCreateSubject(lessonForm.subjectId.replace("__new__",""));ns=r.subjects;sid=r.subjectId;}
                 if(lessonForm.repeat)upd({subjects:ns,weeklyTemplate:[...weeklyTemplate,{id:uid(),childId,subjectId:sid,day:activeDay,lessonNum:+lessonForm.lessonNum,time:lessonForm.time}]});
-                else upd({subjects:ns,dateSchedule:[...(dateSchedule||[]),{id:uid(),childId,date:activeDate,subjectId:sid,lessonNum:+lessonForm.lessonNum,time:lessonForm.time}]});
+                else upd({subjects:ns,dateSchedule:[...(dateSchedule||[]),{id:uid(),childId,date:activeDate,subjectId:sid,lessonNum:+lessonForm.lessonNum,time:lessonForm.time,type:'extra'}]});
                 setLessonForm({subjectId:"",lessonNum:"1",time:lessonTimeFor(1,shift),repeat:true});
               }} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
               {!lessonForm.repeat&&<p className="text-xs text-purple-500 bg-purple-50 rounded-lg px-3 py-1.5">📌 Только на {sd(activeDate).getDate()} {MON[sd(activeDate).getMonth()]}</p>}
