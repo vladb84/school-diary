@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const DAYS=["Пн","Вт","Ср","Чт","Пт","Сб"];
 const DAYS_FULL=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
@@ -14,6 +14,7 @@ export default function HomeworkTab({
   Card, Empty, CollapseBtn, Inp, Sel, Btn,
   GChip, GBadge, GPicker, SBadge,
   grades, expandedGradeId, setExpandedGradeId, chgGrade, delGrade, sc,
+  highlightHw, setHighlightHw,
 }) {
   const [showAddHw, setShowAddHw] = useState(false);
   const [homeworkForm, setHomeworkForm] = useState({subjectId:"",lessonId:"",task:"",due:toDay(),hwType:"hw"});
@@ -27,8 +28,20 @@ export default function HomeworkTab({
   const activeHw = [...chHw].filter(h => !h.done && (h.date||"") >= today).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   const doneHw = [...chHw].filter(h => h.done || (h.date||"") < today).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
 
-  const HwCard = ({h, cls=""}) => (
-    <Card key={h.id} cls={`${h.done?"opacity-70":""} ${h.hwType==="kr"?"border-2 border-red-300":""} ${cls}`}>
+  const highlightRef = useRef(null);
+  useEffect(()=>{
+    if(highlightHw&&highlightRef.current){
+      highlightRef.current.scrollIntoView({behavior:"smooth",block:"center"});
+      const t=setTimeout(()=>setHighlightHw&&setHighlightHw(null),2000);
+      return()=>clearTimeout(t);
+    }
+  },[highlightHw]);
+
+  const HwCard = ({h, cls=""}) => {
+    const isHighlighted = highlightHw===h.id;
+    return (
+    <div ref={isHighlighted?highlightRef:null}>
+    <Card key={h.id} cls={`${h.done?"opacity-70":""} ${h.hwType==="kr"?"border-2 border-red-300":""} ${isHighlighted?"ring-2 ring-orange-400 ring-offset-1":""} ${cls}`}>
       <div className="flex items-start gap-3">
         <button onClick={()=>upd({homework:homework.map(x=>x.id===h.id?{...x,done:!x.done}:x)})}
           className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"border-slate-300 hover:border-green-400"}`}>
@@ -61,7 +74,8 @@ export default function HomeworkTab({
         {isOwner&&<button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
       </div>
     </Card>
-  );
+    </div>
+  );};
 
   return (
     <div>

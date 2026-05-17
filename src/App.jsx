@@ -169,6 +169,7 @@ export default function App(){
   const [showFamilyCode,setShowFamilyCode]=useState(false);
   const [showSubjList,setShowSubjList]=useState(true);
   const [highlightClub,setHighlightClub]=useState(null);
+  const [highlightHw,setHighlightHw]=useState(null);
   const [editClubId,setEditClubId]=useState(null);
   const [editClubF,setEditClubF]=useState({});
   const [phoneStep,setPhoneStep]=useState("input");
@@ -601,7 +602,7 @@ export default function App(){
           activeCh={activeCh} gSubjs={gSubjs} availSubjNames={availSubjNames}
           upd={upd} subj={subj} sc={sc} lessonsFor={lessonsFor} sjGrades={sjGrades}
           seedSchedule={seedSchedule} resolveOrCreateSubject={resolveOrCreateSubject}
-          uid={uid} setSelSubj={setSelSubj} setTab={setTab} setHighlightClub={setHighlightClub}
+          uid={uid} setSelSubj={setSelSubj} setTab={setTab} setHighlightClub={setHighlightClub} setHighlightHw={setHighlightHw}
           homework={homework}
           Card={Card} GBadge={GBadge} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
         />}
@@ -615,6 +616,7 @@ export default function App(){
           GChip={GChip} GBadge={GBadge} GPicker={GPicker} SBadge={SBadge}
           grades={grades} expandedGradeId={expandedGradeId} setExpandedGradeId={setExpandedGradeId}
           chgGrade={chgGrade} delGrade={delGrade} sc={sc}
+          highlightHw={highlightHw} setHighlightHw={setHighlightHw}
         />}
 
         {/* TAB 2 & 3: ОЦЕНКИ / СТАТИСТИКА */}

@@ -21,7 +21,7 @@ export default function ScheduleTab({
   activeCh, gSubjs, availSubjNames,
   upd, subj, sc, lessonsFor, sjGrades,
   seedSchedule, resolveOrCreateSubject,
-  uid, setSelSubj, setTab, setHighlightClub,
+  uid, setSelSubj, setTab, setHighlightClub, setHighlightHw,
   homework,
   Card, GBadge, CollapseBtn, Inp, Sel, Btn,
 }) {
@@ -384,7 +384,10 @@ export default function ScheduleTab({
                                   return <div className="flex flex-wrap gap-1">{recentGr.map(g=><GBadge key={g.id} v={g.value} type={g.type}/>)}</div>;
                                 })()}
                                 {pendHw.length>0&&(
-                                  <p className="text-xs text-orange-500 mt-2">📝 {pendHw.length} невыполн. {pendHw.length===1?"задание":pendHw.length<5?"задания":"заданий"}</p>
+                                  <button onClick={()=>{setHighlightHw(pendHw[0].id);setTab(1);}}
+                                    className="text-xs text-orange-500 mt-2 hover:text-orange-600 hover:underline text-left">
+                                    📝 {pendHw.length} невыполн. {pendHw.length===1?"задание":pendHw.length<5?"задания":"заданий"}
+                                  </button>
                                 )}
                               </div>
                             )}
