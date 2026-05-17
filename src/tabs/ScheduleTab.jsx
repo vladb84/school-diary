@@ -210,7 +210,7 @@ export default function ScheduleTab({
                     const origTime=isMove?lessonTimeFor(l.cancelsSlot,shift):null;
                     const takenSlots=new Set(
                       activeLessons
-                        .filter(x=>x.id!==l.id&&!x._cancelled)
+                        .filter(x=>x.id!==l.id&&!x._cancelled&&!x._movedAway)
                         .map(x=>+x.lessonNum)
                         .filter(n=>n>0)
                     );
