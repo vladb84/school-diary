@@ -13,6 +13,7 @@ export default function HomeworkTab({
   editC, setEditC,
   Card, Empty, CollapseBtn, Inp, Sel, Btn,
   GChip, GBadge, GPicker, SBadge,
+  grades, expandedGradeId, setExpandedGradeId, chgGrade, delGrade, sc,
 }) {
   const [showAddHw, setShowAddHw] = useState(false);
   const [homeworkForm, setHomeworkForm] = useState({subjectId:"",lessonId:"",task:"",due:toDay(),hwType:"hw"});
@@ -36,9 +37,9 @@ export default function HomeworkTab({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             {h.hwType==="kr"&&<span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg border border-red-200">🚨 КР</span>}
-            <SBadge sid={h.subjectId}/>
+            <SBadge sid={h.subjectId} subj={subj} sc={sc}/>
             {h.date&&<span className="text-xs text-slate-400">до {fmtDate(h.date)}</span>}
-            {h.grade&&(isOwner?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}}/>:<GBadge v={h.grade} type="hw"/>)}
+            {h.grade&&(isOwner?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}} isOwner={isOwner} expandedGradeId={expandedGradeId} setExpandedGradeId={setExpandedGradeId} chgGrade={chgGrade} delGrade={delGrade} editC={editC} setEditC={setEditC} upd={upd} grades={grades}/>:<GBadge v={h.grade} type="hw"/>)}
           </div>
           <p className={`text-sm text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
           {h.comment&&(<div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"><p className="text-xs text-amber-600 font-medium">💬 Родитель:</p><p className="text-xs text-amber-800 mt-0.5">{h.comment}</p></div>)}

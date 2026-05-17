@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc, writeBatch } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 import ScheduleTab from "./tabs/ScheduleTab";
 import HomeworkTab from "./tabs/HomeworkTab";
@@ -29,6 +29,9 @@ const weekDates=mon=>Array.from({length:6},(_,i)=>{const d=new Date(mon);d.setDa
 const ds=d=>{const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;};
 const sd=s=>new Date(s+"T00:00:00");
 const genCode=()=>Math.random().toString(36).slice(2,8).toUpperCase();
+// Учебный год начинается в сентябре (месяц 8 в 0-индексации)
+const curSchoolYear=()=>{const n=new Date();return n.getMonth()>=8?n.getFullYear():n.getFullYear()-1;};
+const gradeFromSchoolYear=sy=>{const s=parseInt(sy);if(!s||isNaN(s))return null;const g=curSchoolYear()-s+2;return(g>=1&&g<=11)?g:null;};
 const fmtDate=s=>{if(!s)return"";const p=s.split("-");return p.length===3?`${p[2]}.${p[1]}`:s;};
 const isKR=t=>t==="test";
 const gradeIcon=t=>isKR(t)?"📋":t==="class"?"🙋":"✏️";
@@ -90,6 +93,53 @@ const GPicker=({value,onChange})=>(
   </div>
 );
 
+const GChip=({g,isOwner,expandedGradeId,setExpandedGradeId,chgGrade,delGrade,editC,setEditC,upd,grades})=>{
+  const isE=expandedGradeId===g.id;
+  return(
+    <div className="relative">
+      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${GC[g.value]||"bg-slate-100"} ${isKR(g.type)?"ring-2 ring-current":""} ${isOwner?"cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-current":"cursor-default"}`}
+        onClick={e=>{e.stopPropagation();isOwner&&setExpandedGradeId(isE?null:g.id);}}>
+        <span className="text-xs">{gradeIcon(g.type)}</span>
+        <span className="font-bold text-sm">{g.value}</span>
+        {g.date&&<span className="opacity-50">{fmtDate(g.date)}</span>}
+        {isOwner&&<span className="opacity-40 ml-0.5">✎</span>}
+      </div>
+      {isE&&isOwner&&(
+        <div className="absolute z-20 top-full mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-3 min-w-max">
+          <p className="text-xs text-slate-400 mb-2">Изменить оценку</p>
+          <GPicker value={g.value} onChange={v=>chgGrade(g,v)}/>
+          <div className="mt-2">
+            <p className="text-xs text-slate-400 mb-1.5">Дата</p>
+            <input type="date" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+              value={g.date||""} onChange={e=>{if(g.type==="hw")return;upd({grades:grades.map(x=>x.id===g.id?{...x,date:e.target.value}:x)});}}/>
+          </div>
+          {g.type!=="hw"&&(
+            <div className="mt-2">
+              <p className="text-xs text-slate-400 mb-1.5">Тип</p>
+              <div className="flex gap-1">
+                {[["class","🙋 Устно"],["test","📋 КР"],["hw","✏️ Письменно"]].map(([val,lbl])=>(
+                  <button key={val} onClick={()=>upd({grades:grades.map(x=>x.id===g.id?{...x,type:val}:x)})}
+                    className={"px-2 py-1 rounded-lg text-xs border transition-all "+(g.type===val?"bg-blue-500 text-white border-blue-500":"bg-white text-slate-500 border-slate-200 hover:border-blue-300")}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mt-2">
+            <p className="text-xs text-slate-400 mb-1.5">Комментарий</p>
+            <textarea className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none resize-none" rows={2} placeholder="Заметка к оценке..."
+              value={editC["gr_"+g.id]??(g.comment||"")} onChange={e=>setEditC(p=>({...p,["gr_"+g.id]:e.target.value}))}/>
+            <button onClick={()=>{upd({grades:grades.map(x=>x.id===g.id?{...x,comment:editC["gr_"+g.id]??(g.comment||"")}:x)});setEditC(p=>({...p,["gr_"+g.id]:undefined}));}}
+              className="mt-1 w-full text-xs bg-blue-50 text-blue-500 py-1 border border-blue-100 rounded-lg hover:bg-blue-100">Сохранить</button>
+          </div>
+          <button onClick={e=>{e.stopPropagation();delGrade(g);}} className="mt-2 w-full text-xs text-red-400 py-1 border border-red-100 rounded-lg hover:bg-red-50">Удалить</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SBadge=({sid,subj,sc})=>{const s=subj(sid);return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>;};
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App(){
   const [user,setUser]=useState(undefined);
@@ -131,6 +181,7 @@ export default function App(){
   const [showRemoveChild,setShowRemoveChild]=useState(false);
   const [pendingRemoveId,setPendingRemoveId]=useState(null);
   const [previewChild,setPreviewChild]=useState(false);
+  const [saveError,setSaveError]=useState(false);
 
   useEffect(()=>{
     getRedirectResult(auth).then(result=>{
@@ -166,8 +217,8 @@ export default function App(){
 
   const save=useCallback(async patch=>{
     setDbData(prev=>({...prev,...patch}));
-    try{await updateDoc(doc(db,"families",userRec.familyId),patch);}
-    catch(e){console.error(e);}
+    try{await updateDoc(doc(db,"families",userRec.familyId),patch);setSaveError(false);}
+    catch(e){console.error(e);setSaveError(true);}
   },[userRec]);
 
   const saveStatsPrefs=useCallback(async(order,coll)=>{
@@ -240,9 +291,11 @@ export default function App(){
     try{
       const code=genCode(),familyId=user.uid;
       const initData={...INIT_DB,ownerId:user.uid,familyCode:code,members:[]};
-      await setDoc(doc(db,"families",familyId),initData);
-      await setDoc(doc(db,"familyCodes",code),{familyId});
-      await setDoc(doc(db,"users",user.uid),{familyId,role:"owner"});
+      const batch=writeBatch(db);
+      batch.set(doc(db,"families",familyId),initData);
+      batch.set(doc(db,"familyCodes",code),{familyId});
+      batch.set(doc(db,"users",user.uid),{familyId,role:"owner"});
+      await batch.commit();
       setUserRec({familyId,role:"owner"});setDbData(initData);setStep("select");
     }catch(e){console.error(e);}
     setCodeLoading(false);
@@ -256,6 +309,7 @@ export default function App(){
       const cDoc=await getDoc(doc(db,"familyCodes",code));
       if(!cDoc.exists()){setCodeErr("Код не найден");setCodeLoading(false);return;}
       const{familyId}=cDoc.data();
+      if(familyId===userRec?.familyId){setCodeErr("Это ваша собственная семья");setCodeLoading(false);return;}
       await updateDoc(doc(db,"families",familyId),{members:arrayUnion(user.uid)});
       await setDoc(doc(db,"users",user.uid),{familyId,role:"member"});
       const fDoc=await getDoc(doc(db,"families",familyId));
@@ -271,9 +325,14 @@ export default function App(){
 
   const deleteFamily=async()=>{
     try{
-      await deleteDoc(doc(db,"families",userRec.familyId));
-      await deleteDoc(doc(db,"familyCodes",dbData.familyCode));
-      await deleteDoc(doc(db,"users",user.uid));
+      const batch=writeBatch(db);
+      batch.delete(doc(db,"families",userRec.familyId));
+      batch.delete(doc(db,"familyCodes",dbData.familyCode));
+      batch.delete(doc(db,"users",user.uid));
+      for(const memberId of (dbData.members||[])){
+        batch.delete(doc(db,"users",memberId));
+      }
+      await batch.commit();
       setDbData(null);setUserRec(null);setStep("setup");
       setShowDeleteFamilyConfirm(false);
     }catch(e){console.error(e);alert("Ошибка при удалении.");}
@@ -449,52 +508,6 @@ export default function App(){
     setExpandedGradeId(null);
   };
 
-  const GChip=({g})=>{
-    const isE=expandedGradeId===g.id;
-    return(
-      <div className="relative">
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${GC[g.value]||"bg-slate-100"} ${isKR(g.type)?"ring-2 ring-current":""} ${isOwner?"cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-current":"cursor-default"}`}
-          onClick={e=>{e.stopPropagation();isOwner&&setExpandedGradeId(isE?null:g.id);}}>
-          <span className="text-xs">{gradeIcon(g.type)}</span>
-          <span className="font-bold text-sm">{g.value}</span>
-          {g.date&&<span className="opacity-50">{fmtDate(g.date)}</span>}
-          {isOwner&&<span className="opacity-40 ml-0.5">✎</span>}
-        </div>
-        {isE&&isOwner&&(
-          <div className="absolute z-20 top-full mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-3 min-w-max">
-            <p className="text-xs text-slate-400 mb-2">Изменить оценку</p>
-            <GPicker value={g.value} onChange={v=>chgGrade(g,v)}/>
-            <div className="mt-2">
-              <p className="text-xs text-slate-400 mb-1.5">Дата</p>
-              <input type="date" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                value={g.date||""} onChange={e=>{if(g.type==="hw")return;upd({grades:grades.map(x=>x.id===g.id?{...x,date:e.target.value}:x)});}}/>
-            </div>
-            {g.type!=="hw"&&(
-              <div className="mt-2">
-                <p className="text-xs text-slate-400 mb-1.5">Тип</p>
-                <div className="flex gap-1">
-                  {[["class","🙋 Устно"],["test","📋 КР"],["hw","✏️ Письменно"]].map(([val,lbl])=>(
-                    <button key={val} onClick={()=>upd({grades:grades.map(x=>x.id===g.id?{...x,type:val}:x)})}
-                      className={"px-2 py-1 rounded-lg text-xs border transition-all "+(g.type===val?"bg-blue-500 text-white border-blue-500":"bg-white text-slate-500 border-slate-200 hover:border-blue-300")}>{lbl}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="mt-2">
-              <p className="text-xs text-slate-400 mb-1.5">Комментарий</p>
-              <textarea className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none resize-none" rows={2} placeholder="Заметка к оценке..."
-                value={editC["gr_"+g.id]??(g.comment||"")} onChange={e=>setEditC(p=>({...p,["gr_"+g.id]:e.target.value}))}/>
-              <button onClick={()=>{upd({grades:grades.map(x=>x.id===g.id?{...x,comment:editC["gr_"+g.id]??(g.comment||"")}:x)});setEditC(p=>({...p,["gr_"+g.id]:undefined}));}}
-                className="mt-1 w-full text-xs bg-blue-50 text-blue-500 py-1 border border-blue-100 rounded-lg hover:bg-blue-100">Сохранить</button>
-            </div>
-            <button onClick={e=>{e.stopPropagation();delGrade(g);}} className="mt-2 w-full text-xs text-red-400 py-1 border border-red-100 rounded-lg hover:bg-red-50">Удалить</button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const SBadge=({sid})=>{const s=subj(sid);return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>;};
   const hwPending=chHw.filter(h=>!h.done&&h.hwType!=="kr").length;
   const gSubjs=gradeSubjects(activeCh?.grade);
   const schedSubjNames=[...new Set(chTpl.map(l=>subj(l.subjectId)?.name).filter(Boolean))];
@@ -505,7 +518,7 @@ export default function App(){
   const addChild=()=>{
     if(!newChild.name.trim())return;
     const by=parseInt(newChild.birthYear)||null,sy=parseInt(newChild.schoolYear)||null;
-    const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
+    const grade=gradeFromSchoolYear(sy);
     let ns=[...subjects];
     if(grade)(gradeSubjects(grade)||[]).forEach(name=>{if(!ns.find(s=>s.name===name))ns.push({id:uid(),name,c:ns.length%SC.length});});
     upd({subjects:ns,children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
@@ -518,9 +531,9 @@ export default function App(){
     setPendingRemoveId(null);
   };
 
-  const calcGrade=ch=>{if(!ch)return null;const g=Number(ch.grade);if(g>0)return g;const sy=parseInt(ch.schoolYear);return(!isNaN(sy)&&sy>0&&sy<=new Date().getFullYear())?new Date().getFullYear()-sy+1:null;};
-  const seedSchedule=()=>{
-    const ch=activeCh||(children.length===1?children[0]:null);
+  const calcGrade=ch=>{if(!ch)return null;const g=Number(ch.grade);if(g>0)return g;return gradeFromSchoolYear(ch.schoolYear);};
+  const seedSchedule=(targetCh)=>{
+    const ch=targetCh||activeCh||(children.length===1?children[0]:null);
     const grade=calcGrade(ch);
     if(!grade||!ch){setTab(6);if(ch){setEditChildId(ch.id);setEditChildF({});}return;}
     const g=Math.min(Math.max(grade,1),11);
@@ -566,6 +579,12 @@ export default function App(){
           {realOwner&&<button onClick={()=>{setPreviewChild(v=>!v);setTab(0);}} title={previewChild?"Вернуться в режим родителя":"Посмотреть глазами ребёнка"} className={`flex-shrink-0 text-lg w-9 h-9 flex items-center justify-center rounded-xl transition-all ${previewChild?"bg-purple-500 text-white shadow":"bg-white text-slate-400 hover:text-purple-500 hover:bg-purple-50"}`}>👁</button>}
         </div>
 
+        {saveError&&(
+          <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2 text-sm text-red-600 flex items-center gap-2">
+            <span>⚠️ Не удалось сохранить. Проверь соединение.</span>
+            <button onClick={()=>setSaveError(false)} className="ml-auto text-red-400 text-lg leading-none">×</button>
+          </div>
+        )}
         <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
           {TABS.map((t,i)=>(
             <button key={i} onClick={()=>setTab(i)}
@@ -594,6 +613,8 @@ export default function App(){
           subj={subj} uid={uid} editC={editC} setEditC={setEditC}
           Card={Card} Empty={Empty} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
           GChip={GChip} GBadge={GBadge} GPicker={GPicker} SBadge={SBadge}
+          grades={grades} expandedGradeId={expandedGradeId} setExpandedGradeId={setExpandedGradeId}
+          chgGrade={chgGrade} delGrade={delGrade} sc={sc}
         />}
 
         {/* TAB 2 & 3: ОЦЕНКИ / СТАТИСТИКА */}
@@ -607,6 +628,8 @@ export default function App(){
           setCollAndSave={setCollAndSave} setOrderAndSave={setOrderAndSave}
           Card={Card} Empty={Empty} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
           GPicker={GPicker}
+          expandedGradeId={expandedGradeId} setExpandedGradeId={setExpandedGradeId}
+          chgGrade={chgGrade} delGrade={delGrade} editC={editC} setEditC={setEditC}
         />}
 
         {/* TAB 4: КРУЖКИ */}
@@ -761,11 +784,14 @@ export default function App(){
                   <button onClick={async()=>{
                     if(!window.confirm("Сгенерировать новый код? Старый перестанет работать для новых входов."))return;
                     const newCode=genCode();
-                    upd({familyCode:newCode});
                     try{
-                      await deleteDoc(doc(db,"familyCodes",dbData.familyCode));
-                      await setDoc(doc(db,"familyCodes",newCode),{familyId:userRec.familyId});
-                    }catch(e){console.error(e);}
+                      const batch=writeBatch(db);
+                      batch.delete(doc(db,"familyCodes",dbData.familyCode));
+                      batch.set(doc(db,"familyCodes",newCode),{familyId:userRec.familyId});
+                      batch.update(doc(db,"families",userRec.familyId),{familyCode:newCode});
+                      await batch.commit();
+                      setDbData(prev=>({...prev,familyCode:newCode}));
+                    }catch(e){console.error(e);alert("Ошибка смены кода.");}
                   }} className="w-full text-xs text-amber-600 border border-amber-200 rounded-lg py-2 hover:bg-amber-100 transition-all">
                     🔄 Сгенерировать новый код
                   </button>
@@ -787,9 +813,7 @@ export default function App(){
                       <Inp cls="w-24" placeholder="с 2017" type="number"
                         value={newChild.schoolYear}
                         onChange={e=>setNewChild(p=>({...p,schoolYear:e.target.value}))}/>
-                      {(()=>{const sy=parseInt(newChild.schoolYear);if(!sy||isNaN(sy)||sy>new Date().getFullYear())return null;return(
-                        <div className="flex items-center px-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-600 whitespace-nowrap">{new Date().getFullYear()-sy+1} кл.</div>
-                      );})()}
+                      {(()=>{const g=gradeFromSchoolYear(newChild.schoolYear);return g?(<div className="flex items-center px-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-600 whitespace-nowrap">{g} кл.</div>):null;})()}
                     </div>
                     <Btn onClick={addChild} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
                   </div>
@@ -823,14 +847,14 @@ export default function App(){
                               onChange={e=>setEditChildF(p=>({...p,schoolYear:e.target.value}))}/>
                           </div>
                         </div>
-                        {(()=>{const raw=editChildF.schoolYear??ch.schoolYear;const sy=parseInt(raw);return raw&&!isNaN(sy)&&sy<=new Date().getFullYear()&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎒 Текущий класс: <b>{new Date().getFullYear()-sy+1}</b></p>;})()}
+                        {(()=>{const raw=editChildF.schoolYear??ch.schoolYear;const g=gradeFromSchoolYear(raw);return g&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎒 Текущий класс: <b>{g}</b></p>;})()}
                         <div className="flex gap-2">
                           <Btn onClick={()=>{
                             const name=(editChildF.name??ch.name).trim();
                             if(!name)return;
                             const by=parseInt(editChildF.birthYear??ch.birthYear)||null;
                             const sy=parseInt(editChildF.schoolYear??ch.schoolYear)||null;
-                            const grade=(sy&&sy<=new Date().getFullYear())?(new Date().getFullYear()-sy+1):null;
+                            const grade=gradeFromSchoolYear(sy);
                             let ns=[...subjects];
                             if(grade&&!ch.grade)(gradeSubjects(grade)||[]).forEach(n=>{if(!ns.find(s=>s.name===n))ns.push({id:uid(),name:n,c:ns.length%SC.length});});
                             upd({subjects:ns,children:children.map(x=>x.id===ch.id?{...x,name,birthYear:by,schoolYear:sy,grade}:x)});
@@ -858,24 +882,7 @@ export default function App(){
                           </button>
                         </div>
                       {weeklyTemplate.filter(l=>l.childId===ch.id).length===0&&(
-                        <button onClick={e=>{e.stopPropagation();
-                          const sy=parseInt(ch.schoolYear);
-                          const grade=ch.grade||(sy&&!isNaN(sy)&&sy<=new Date().getFullYear()?new Date().getFullYear()-sy+1:null);
-                          if(!grade){setEditChildId(ch.id);setEditChildF({});return;}
-
-                          const g=Math.min(Math.max(grade,1),11);
-                          const plan=SCHEDULE_BY_GRADE[g]||SCHEDULE_BY_GRADE[8];
-                          let ns=[...subjects];let nt=[...weeklyTemplate];
-                          plan.forEach(({day,subjects:subs})=>{subs.forEach((name,i)=>{
-                            let s=ns.find(x=>x.name===name);
-                            if(!s){s={id:uid(),name,c:ns.length%SC.length};ns.push(s);}
-                            nt.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
-                          });});
-                          const usedIds=new Set([...nt.map(l=>l.subjectId),...homework.map(h=>h.subjectId),...grades.map(g=>g.subjectId)].filter(Boolean));
-                          const cleanedSubjects=ns.filter(s=>usedIds.has(s.id));
-                          if(childId!==ch.id)setChildId(ch.id);
-                          upd({subjects:cleanedSubjects,weeklyTemplate:nt});
-                        }} className="mt-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 hover:bg-emerald-100 transition-all">
+                        <button onClick={e=>{e.stopPropagation();seedSchedule(ch);}} className="mt-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 hover:bg-emerald-100 transition-all">
                           ✨ Заполнить расписание
                         </button>
                       )}

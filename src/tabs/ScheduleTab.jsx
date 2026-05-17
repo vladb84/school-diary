@@ -298,7 +298,7 @@ export default function ScheduleTab({
                                     +📝
                                   </button>
                                 )}
-                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id)});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
+                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id),dateSchedule:(dateSchedule||[]).filter(x=>!(x.childId===childId&&x.cancelsSlot===l.lessonNum&&x.day===activeDay))});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
                               </div>
                             )}
                             {isOwner&&isExpanded&&!isCancelled&&!isSubstitution&&(

@@ -21,6 +21,7 @@ export default function GradesTab({
   statsOrder, statsColl,
   setCollAndSave, setOrderAndSave,
   Card, Empty, CollapseBtn, Inp, Sel, Btn, GPicker,
+  expandedGradeId, setExpandedGradeId, chgGrade, delGrade, editC, setEditC,
 }) {
   const [showAddGrade, setShowAddGrade] = useState(false);
   const [gradeForm, setGradeForm] = useState({subjectId:"",value:"5",date:toDay(),type:"class"});
@@ -76,7 +77,7 @@ export default function GradesTab({
                     <span className={`px-2 py-0.5 rounded-lg text-sm font-medium flex-1 ${sc(s)}`}>{s.name}</span>
                     {av&&<span className={`px-2 py-1 rounded-lg text-sm font-bold ${GC[Math.round(parseFloat(av))]||""}`}>Ср: {av}</span>}
                   </div>
-                  <div className="flex flex-wrap gap-2">{gs.map((g,i)=><GChip key={i} g={g}/>)}</div>
+                  <div className="flex flex-wrap gap-2">{gs.map((g,i)=><GChip key={i} g={g} isOwner={isOwner} expandedGradeId={expandedGradeId} setExpandedGradeId={setExpandedGradeId} chgGrade={chgGrade} delGrade={delGrade} editC={editC} setEditC={setEditC} upd={upd} grades={grades}/>)}</div>
                 </Card>
               );
             })
