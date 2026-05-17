@@ -389,6 +389,10 @@ export default function ScheduleTab({
                                     📝 {pendHw.length} невыполн. {pendHw.length===1?"задание":pendHw.length<5?"задания":"заданий"}
                                   </button>
                                 )}
+                                <button onClick={()=>{setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");setExpandedSubjLesson(null);}}
+                                  className="mt-2 w-full text-xs bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all text-left">
+                                  ✏️ Записать задание
+                                </button>
                               </div>
                             )}
                             {!isCancelled&&hwChips.length>0&&(
