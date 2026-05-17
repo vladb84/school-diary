@@ -290,14 +290,8 @@ export default function ScheduleTab({
                                   onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
                                   {s?.name||"?"}
                                 </span>
-                                {hasKR?<span className="text-red-500 text-xs">🚨</span>:pendHw.length>0?<span className="text-orange-400 text-xs">📝</span>:null}
                                 {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
-                                {isOwner&&(
-                                  <button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");}}
-                                    className="text-slate-400 hover:text-blue-500 text-xs px-1.5 py-0.5 rounded-lg border border-slate-200 hover:border-blue-300 transition-all">
-                                    +📝
-                                  </button>
-                                )}
+                                {hasKR?<span className="w-2 h-2 rounded-full bg-red-400 inline-block flex-shrink-0"/>:pendHw.length>0?<span className="w-2 h-2 rounded-full bg-orange-400 inline-block flex-shrink-0"/>:null}
                                 {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id),dateSchedule:(dateSchedule||[]).filter(x=>!(x.childId===childId&&x.cancelsSlot===l.lessonNum&&x.day===activeDay))});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
                               </div>
                             )}
