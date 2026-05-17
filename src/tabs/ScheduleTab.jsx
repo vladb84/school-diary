@@ -290,7 +290,7 @@ export default function ScheduleTab({
                                   onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
                                   {s?.name||"?"}
                                 </span>
-                                {lAvg&&<GBadge v={lAvg} type=""/>}
+                                {lAvg&&<span className="px-2 py-0.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-400">~{lAvg}</span>}
                                 {hasKR?<span className="w-2 h-2 rounded-full bg-red-400 inline-block flex-shrink-0"/>:pendHw.length>0?<span className="w-2 h-2 rounded-full bg-orange-400 inline-block flex-shrink-0"/>:null}
                                 {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id),dateSchedule:(dateSchedule||[]).filter(x=>!(x.childId===childId&&x.cancelsSlot===l.lessonNum&&x.day===activeDay))});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
                               </div>
