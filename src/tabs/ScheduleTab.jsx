@@ -396,13 +396,14 @@ export default function ScheduleTab({
                               </div>
                             )}
                             {!isCancelled&&hwChips.length>0&&(
-                              <div className="flex flex-wrap gap-1 mt-2">
+                              <div className="flex flex-wrap gap-1 mt-2 items-center">
                                 {hwChips.map(hw=>(
                                   <div key={hw.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${hw.done?"bg-green-50 border-green-200 text-green-700 line-through":"bg-blue-50 border-blue-200 text-blue-700"}`}>
                                     <span className="max-w-[120px] truncate">{hw.task?.slice(0,25)}</span>
                                     {isOwner&&<button onClick={e=>{e.stopPropagation();upd({homework:(homework||[]).filter(x=>x.id!==hw.id)});}} className="text-slate-400 hover:text-red-400 ml-0.5">×</button>}
                                   </div>
                                 ))}
+                                {!showQuickForm&&<button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");setExpandedSubjLesson(null);}} className="w-5 h-5 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 text-xs flex items-center justify-center transition-all">+</button>}
                               </div>
                             )}
                             {!isCancelled&&showQuickForm&&(
