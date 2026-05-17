@@ -603,7 +603,7 @@ export default function App(){
           upd={upd} subj={subj} sc={sc} lessonsFor={lessonsFor} sjGrades={sjGrades} avgGrade={avgGrade}
           seedSchedule={seedSchedule} resolveOrCreateSubject={resolveOrCreateSubject}
           uid={uid} setSelSubj={setSelSubj} setTab={setTab} setHighlightClub={setHighlightClub} setHighlightHw={setHighlightHw}
-          homework={homework}
+          homework={homework} grades={grades}
           Card={Card} GBadge={GBadge} CollapseBtn={CollapseBtn} Inp={Inp} Sel={Sel} Btn={Btn}
         />}
 

@@ -71,7 +71,11 @@ export default function HomeworkTab({
             </div>
           )}
         </div>
-        {isOwner&&<button onClick={()=>upd({homework:homework.filter(x=>x.id!==h.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+        {isOwner&&<button onClick={()=>{
+          const patch={homework:homework.filter(x=>x.id!==h.id)};
+          if(h.grade)patch.grades=[...(grades||[]),{id:uid(),childId,subjectId:h.subjectId,value:h.grade,date:h.date||'',type:'hw',comment:''}];
+          upd(patch);
+        }} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
       </div>
     </Card>
     </div>
