@@ -600,7 +600,7 @@ export default function App(){
           childId={childId} isOwner={isOwner} chHw={chHw} chCl={chCl} chTpl={chTpl}
           subjects={subjects} weeklyTemplate={weeklyTemplate} dateSchedule={dateSchedule} clubs={clubs}
           activeCh={activeCh} gSubjs={gSubjs} availSubjNames={availSubjNames}
-          upd={upd} subj={subj} sc={sc} lessonsFor={lessonsFor} sjGrades={sjGrades}
+          upd={upd} subj={subj} sc={sc} lessonsFor={lessonsFor} sjGrades={sjGrades} avgGrade={avgGrade}
           seedSchedule={seedSchedule} resolveOrCreateSubject={resolveOrCreateSubject}
           uid={uid} setSelSubj={setSelSubj} setTab={setTab} setHighlightClub={setHighlightClub} setHighlightHw={setHighlightHw}
           homework={homework}

@@ -19,7 +19,7 @@ export default function ScheduleTab({
   childId, isOwner, chHw, chCl, chTpl,
   subjects, weeklyTemplate, dateSchedule, clubs,
   activeCh, gSubjs, availSubjNames,
-  upd, subj, sc, lessonsFor, sjGrades,
+  upd, subj, sc, lessonsFor, sjGrades, avgGrade,
   seedSchedule, resolveOrCreateSubject,
   uid, setSelSubj, setTab, setHighlightClub, setHighlightHw,
   homework,
@@ -193,7 +193,7 @@ export default function ScheduleTab({
                     const isExtra=!!l.date&&!l.cancelsSlot&&(!l.type||l.type==='extra');
                     const isSubstitution=isReplace||isMove||isExtra;
                     const isExpanded=expandedLesson===l.id;
-                    const lGr=sjGrades(l.subjectId||'').slice(0,1);
+                    const lAvg=avgGrade(l.subjectId||'');
                     const pendHw=chHw.filter(h=>h.subjectId===l.subjectId&&!h.done);
                     const hasKR=pendHw.some(h=>h.hwType==="kr");
                     const dotColor=(isCancelled||isMovedAway)?'#cbd5e1':DOT_COLORS[((s?.c)||0)%DOT_COLORS.length];
@@ -290,7 +290,7 @@ export default function ScheduleTab({
                                   onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
                                   {s?.name||"?"}
                                 </span>
-                                {lGr[0]&&<GBadge v={lGr[0].value} type={lGr[0].type}/>}
+                                {lAvg&&<GBadge v={lAvg} type=""/>}
                                 {hasKR?<span className="w-2 h-2 rounded-full bg-red-400 inline-block flex-shrink-0"/>:pendHw.length>0?<span className="w-2 h-2 rounded-full bg-orange-400 inline-block flex-shrink-0"/>:null}
                                 {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id),dateSchedule:(dateSchedule||[]).filter(x=>!(x.childId===childId&&x.cancelsSlot===l.lessonNum&&x.day===activeDay))});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
                               </div>
