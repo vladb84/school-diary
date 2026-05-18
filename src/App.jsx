@@ -144,7 +144,7 @@ const GChip=({g,isOwner,expandedGradeId,setExpandedGradeId,chgGrade,delGrade,edi
   );
 };
 
-const SBadge=({sid,subj,sc})=>{const s=subj(sid);return <span className={`sbadge ${sc(s)}`}>{s?.name||"?"}</span>;};
+const SBadge=({sid,subj,sc})=>{const s=subj(sid);return <span className={sc(s)}>{s?.name||"?"}</span>;};
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App(){
@@ -527,7 +527,7 @@ export default function App(){
   const gSubjs=gradeSubjects(activeCh?.grade);
   const schedSubjNames=[...new Set(chTpl.map(l=>subj(l.subjectId)?.name).filter(Boolean))];
   const availSubjNames=gSubjs?[...new Set([...gSubjs,...schedSubjNames])]:subjects.map(s=>s.name);
-  const resolveOrCreateSubject=name=>{const ex=subjects.find(s=>s.name===name);if(ex)return{subjects,subjectId:ex.id};const ns={id:uid(),name,c:subjects.length%SC.length};return{subjects:[...subjects,ns],subjectId:ns.id};};
+  const resolveOrCreateSubject=name=>{const ex=subjects.find(s=>s.name===name);if(ex)return{subjects,subjectId:ex.id};const ns={id:uid(),name,c:subjects.length%SC_LEN};return{subjects:[...subjects,ns],subjectId:ns.id};};
   const TABS=isOwner?["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки","📚 Предметы","👨‍👩‍👧‍👦 Семья"]:["📅 Расписание","📝 Задания","⭐ Оценки","📊 Статистика","🏆 Кружки"];
 
   const addChild=()=>{
@@ -535,7 +535,7 @@ export default function App(){
     const by=parseInt(newChild.birthYear)||null,sy=parseInt(newChild.schoolYear)||null;
     const grade=gradeFromSchoolYear(sy);
     let ns=[...subjects];
-    if(grade)(gradeSubjects(grade)||[]).forEach(name=>{if(!ns.find(s=>s.name===name))ns.push({id:uid(),name,c:ns.length%SC.length});});
+    if(grade)(gradeSubjects(grade)||[]).forEach(name=>{if(!ns.find(s=>s.name===name))ns.push({id:uid(),name,c:ns.length%SC_LEN});});
     upd({subjects:ns,children:[...children,{id:uid(),name:newChild.name.trim(),colorIdx:children.length%CBG.length,birthYear:by,schoolYear:sy,grade}]});
     setNewChild({name:"",birthYear:"",schoolYear:""});
   };
@@ -558,7 +558,7 @@ export default function App(){
     plan.forEach(({day,subjects:sNames})=>{
       sNames.forEach((name,i)=>{
         let s=newSubjects.find(x=>x.name===name);
-        if(!s){s={id:uid(),name,c:newSubjects.length%SC.length};newSubjects.push(s);}
+        if(!s){s={id:uid(),name,c:newSubjects.length%SC_LEN};newSubjects.push(s);}
         newTemplate.push({id:uid(),childId:ch.id,subjectId:s.id,day,lessonNum:i+1,time:lessonTime(i+1)});
       });
     });
@@ -762,8 +762,8 @@ export default function App(){
               {showAddSubj&&(
                 <div className="mt-3 flex gap-2">
                   <Inp cls="flex-1" placeholder="Название предмета" value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)}
-                    onKeyDown={e=>{if(e.key==="Enter"&&newSubjectName.trim()){upd({subjects:[...subjects,{id:uid(),name:newSubjectName.trim(),c:subjects.length%SC.length}]});setNewSubjectName("");}}}/>
-                  <Btn onClick={()=>{if(!newSubjectName.trim())return;upd({subjects:[...subjects,{id:uid(),name:newSubjectName.trim(),c:subjects.length%SC.length}]});setNewSubjectName("");}} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
+                    onKeyDown={e=>{if(e.key==="Enter"&&newSubjectName.trim()){upd({subjects:[...subjects,{id:uid(),name:newSubjectName.trim(),c:subjects.length%SC_LEN}]});setNewSubjectName("");}}}/>
+                  <Btn onClick={()=>{if(!newSubjectName.trim())return;upd({subjects:[...subjects,{id:uid(),name:newSubjectName.trim(),c:subjects.length%SC_LEN}]});setNewSubjectName("");}} cls="bg-blue-500 text-white hover:bg-blue-600">+</Btn>
                 </div>
               )}
             </Card>
@@ -872,7 +872,7 @@ export default function App(){
                             const sy=parseInt(editChildF.schoolYear??ch.schoolYear)||null;
                             const grade=gradeFromSchoolYear(sy);
                             let ns=[...subjects];
-                            if(grade&&!ch.grade)(gradeSubjects(grade)||[]).forEach(n=>{if(!ns.find(s=>s.name===n))ns.push({id:uid(),name:n,c:ns.length%SC.length});});
+                            if(grade&&!ch.grade)(gradeSubjects(grade)||[]).forEach(n=>{if(!ns.find(s=>s.name===n))ns.push({id:uid(),name:n,c:ns.length%SC_LEN});});
                             upd({subjects:ns,children:children.map(x=>x.id===ch.id?{...x,name,birthYear:by,schoolYear:sy,grade}:x)});
                             setEditChildId(null);setEditChildF({});
                           }} cls="flex-1 bg-blue-500 text-white hover:bg-blue-600">Сохранить</Btn>
