@@ -384,12 +384,12 @@ export default function App(){
 
   // ── Экраны входа ────────────────────────────────────────────────────────────
   if(step==="login")return(
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="bg-white rounded-3xl shadow-lg p-10 max-w-sm w-full text-center">
         <div className="text-6xl mb-4">📚</div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Школьный дневник</h1>
-        <p className="text-slate-400 text-sm mb-6">Планировщик для всей семьи</p>
-        <button onClick={login} className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-3 text-sm font-medium hover:bg-slate-50 transition-all shadow-sm mb-3">
+        <h1 className="text-2xl font-bold mb-2" style={{color:"var(--text-primary)"}}>Школьный дневник</h1>
+        <p className="text-sm mb-6" style={{color:"var(--text-muted)"}}>Планировщик для всей семьи</p>
+        <button onClick={login} className="w-full flex items-center justify-center gap-3 card rounded-xl px-6 py-3 text-sm font-medium transition-all mb-3" style={{color:"var(--text-primary)"}}>
           <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           Войти через Google
         </button>
@@ -431,7 +431,7 @@ export default function App(){
   );
 
   if(step==="setup")return(
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
         <div className="text-center mb-6"><div className="text-5xl mb-3">👋</div><h1 className="text-xl font-bold text-slate-800">Добро пожаловать!</h1><p className="text-slate-400 text-sm mt-1">{user.email||user.phoneNumber}</p></div>
         <div className="space-y-3">
@@ -444,7 +444,7 @@ export default function App(){
   );
 
   if(step==="join")return(
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
         <button onClick={()=>setStep("setup")} className="text-slate-400 text-sm mb-4 hover:text-slate-600">← Назад</button>
         <div className="text-center mb-6"><div className="text-5xl mb-3">🔑</div><h1 className="text-xl font-bold text-slate-800">Войти в семью</h1><p className="text-slate-400 text-sm mt-1">Попроси родителя назвать код</p></div>
@@ -471,7 +471,7 @@ export default function App(){
   const todayStr=toDay();
 
   if(step==="select")return(
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-slate-700 mb-2">👋 Привет!</h1>
         <p className="text-slate-400">Выбери свой профиль</p>
@@ -482,10 +482,10 @@ export default function App(){
         ?<div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6"><p className="text-slate-400 text-sm">{isOwner?"Добавьте детей в разделе «Семья».":"Попросите родителя добавить ваш профиль."}</p></div>
         :<div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
           {children.map(ch=>(
-            <button key={ch.id} onClick={()=>selectProfile(ch)} className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-md active:scale-95 transition-all">
+            <button key={ch.id} onClick={()=>selectProfile(ch)} className="card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
               <div className={`w-16 h-16 rounded-full ${cbg(ch.colorIdx)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>{(ch.name?.[0]??"?").toUpperCase()}</div>
-              <span className="text-slate-700 font-semibold text-sm">{ch.name}</span>
-              {ch.grade&&<span className="text-xs text-slate-400">{ch.grade} класс</span>}
+              <span className="font-semibold text-sm" style={{color:"var(--text-primary)"}}>{ch.name}</span>
+              {ch.grade&&<span className="text-xs" style={{color:"var(--text-muted)"}}>{ch.grade} класс</span>}
             </button>
           ))}
         </div>
@@ -569,16 +569,17 @@ export default function App(){
   };
 
   return(
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans" onClick={()=>expandedGradeId&&setExpandedGradeId(null)}>
+    <div className="min-h-screen font-sans" onClick={()=>expandedGradeId&&setExpandedGradeId(null)}>
       <div className="max-w-2xl mx-auto p-4" onClick={e=>e.stopPropagation()}>
 
         <div className="flex items-center gap-2 mb-4">
-          <button onClick={()=>{setStep("select");setExpandedGradeId(null);setSelSubj(null);setPreviewChild(false);}} className="text-slate-400 hover:text-slate-600 text-xl w-8">←</button>
+          <button onClick={()=>{setStep("select");setExpandedGradeId(null);setSelSubj(null);setPreviewChild(false);}} className="text-xl w-8" style={{color:"var(--text-muted)"}}>←</button>
           {isOwner
             ?<div className="flex gap-1.5 flex-1 overflow-x-auto pb-0.5">
               {children.map(ch=>(
                 <button key={ch.id} onClick={()=>setChildId(ch.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${childId===ch.id?cbg(ch.colorIdx)+" text-white shadow":"bg-white text-slate-600 hover:bg-slate-100"}`}>
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${childId===ch.id?cbg(ch.colorIdx)+" text-white shadow":""}`}
+                  style={childId!==ch.id?{background:"var(--bg-card)",color:"var(--text-secondary)"}:{}}>
                   <span className="font-bold">{(ch.name?.[0]??"?")}</span>
                   <span>{ch.name}</span>
                   {ch.grade&&<span className={`text-xs ${childId===ch.id?"opacity-70":"text-slate-400"}`}>{ch.grade}кл</span>}
@@ -587,23 +588,24 @@ export default function App(){
             </div>
             :<div className="flex items-center gap-2 flex-1">
               {activeCh&&<div className={`w-8 h-8 rounded-full ${cbg(activeCh.colorIdx)} flex items-center justify-center text-white font-bold text-sm`}>{(activeCh.name?.[0]??"?")}</div>}
-              <span className="font-semibold text-slate-700">{activeCh?.name||"Дневник"}</span>
-              {previewChild&&<span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">вид ребёнка</span>}
+              <span className="font-semibold" style={{color:"var(--text-primary)"}}>{activeCh?.name||"Дневник"}</span>
+              {previewChild&&<span className="text-xs px-2 py-0.5 rounded-full" style={{background:"var(--bg-tag)",color:"var(--accent-text)"}}>вид ребёнка</span>}
             </div>
           }
-          {realOwner&&<button onClick={()=>{setPreviewChild(v=>!v);setTab(0);}} title={previewChild?"Вернуться в режим родителя":"Посмотреть глазами ребёнка"} className={`flex-shrink-0 text-lg w-9 h-9 flex items-center justify-center rounded-xl transition-all ${previewChild?"bg-purple-500 text-white shadow":"bg-white text-slate-400 hover:text-purple-500 hover:bg-purple-50"}`}>👁</button>}
+          {realOwner&&<button onClick={()=>{setPreviewChild(v=>!v);setTab(0);}} title={previewChild?"Вернуться в режим родителя":"Посмотреть глазами ребёнка"} className="flex-shrink-0 text-lg w-9 h-9 flex items-center justify-center rounded-xl transition-all card" style={previewChild?{background:"var(--accent)",color:"white"}:{color:"var(--text-muted)"}}>👁</button>}
         </div>
 
         {saveError&&(
-          <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2 text-sm text-red-600 flex items-center gap-2">
+          <div className="save-error-banner mb-3 rounded-xl px-4 py-2 text-sm flex items-center gap-2">
             <span>⚠️ Не удалось сохранить. Проверь соединение.</span>
-            <button onClick={()=>setSaveError(false)} className="ml-auto text-red-400 text-lg leading-none">×</button>
+            <button onClick={()=>setSaveError(false)} className="ml-auto text-lg leading-none" style={{color:"var(--danger-text)"}}>×</button>
           </div>
         )}
-        <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
+        <div className="flex gap-1 mb-4 card p-1 overflow-x-auto">
           {TABS.map((t,i)=>(
             <button key={i} onClick={()=>setTab(i)}
-              className={`flex-shrink-0 flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${tab===i?"bg-blue-500 text-white shadow":"text-slate-500 hover:bg-slate-100"}`}>
+              className={`flex-shrink-0 flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-all`}
+              style={tab===i?{background:"var(--accent)",color:"white"}:{color:"var(--text-muted)"}}>
               {t}{i===1&&hwPending>0&&<span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1">{hwPending}</span>}
             </button>
           ))}
@@ -667,7 +669,7 @@ export default function App(){
                           value={editClubF.time??c.time??""}
                           onChange={e=>setEditClubF(p=>({...p,time:maskTime(e.target.value)}))}/>
                       </div>
-                      <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none" rows={2} placeholder="Комментарий..."
+                      <textarea className="inp rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" rows={2} placeholder="Комментарий..."
                         value={editClubF.comment??c.comment??""} onChange={e=>setEditClubF(p=>({...p,comment:e.target.value}))}/>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={editClubF.repeat!=null?editClubF.repeat:c.repeat!==false} onChange={e=>setEditClubF(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
@@ -688,7 +690,7 @@ export default function App(){
                       <div className="flex-1">
                         <p className={`text-sm font-medium text-slate-700 ${c.done?"line-through":""}`}>{c.name}</p>
                         <p className="text-xs text-slate-400">{DAYS_FULL[DAYS.indexOf(c.day)]}{c.time?`, ${c.time}`:""}</p>
-                        {c.comment&&<div className="mt-1 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1"><p className="text-xs text-amber-800">💬 {c.comment}</p></div>}
+                        {c.comment&&<div className="comment-block mt-1"><p className="comment-text">💬 {c.comment}</p></div>}
                       </div>
                       {isOwner&&<button onClick={()=>{setEditClubId(c.id);setEditClubF({});}} className="text-slate-300 hover:text-blue-400 text-sm px-1">✎</button>}
                       {isOwner&&<button onClick={()=>upd({clubs:clubs.filter(x=>x.id!==c.id)})} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
@@ -773,6 +775,19 @@ export default function App(){
         {/* TAB 6: СЕМЬЯ */}
         {tab===6&&isOwner&&(
           <div>
+            <Card cls="mb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium" style={{color:"var(--text-primary)"}}>
+                  {theme==='dark'?'🌙 Тёмная тема':'☀️ Светлая тема'}
+                </span>
+                <button
+                  onClick={()=>setTheme(t=>t==='dark'?'light':'dark')}
+                  className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={{background:"var(--bg-tag)",color:"var(--accent-text)",border:"1px solid var(--border-active)"}}>
+                  Переключить
+                </button>
+              </div>
+            </Card>
             <Card cls="mb-4 bg-amber-50 border border-amber-100">
               <CollapseBtn open={showFamilyCode} onToggle={()=>setShowFamilyCode(v=>!v)} label="🔑 Код семьи"/>
               {showFamilyCode&&(
