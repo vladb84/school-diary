@@ -67,7 +67,7 @@ export default function HomeworkTab({
                 <textarea className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" placeholder="Комментарий для ребёнка..." rows={2}
                   value={editC[h.id]??h.comment} onChange={e=>setEditC(p=>({...p,[h.id]:e.target.value}))}/>
                 <button onClick={()=>{upd({homework:homework.map(x=>x.id===h.id?{...x,comment:editC[h.id]??h.comment}:x)});setEditC(p=>({...p,[h.id]:undefined}));}}
-                  className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
+                  className="bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
               </div>
             </div>
           )}
