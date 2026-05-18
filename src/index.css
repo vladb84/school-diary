@@ -53,6 +53,8 @@
   --error-text:     #f87171;
 
   --shadow-card:    none;
+  --bg-card-kr:     linear-gradient(135deg, rgba(239,68,68,.18), rgba(220,38,38,.10));
+  --border-kr:      rgba(239,68,68,.30);
 }
 
 /* ── Светлая тема ──────────────────────────────────────────────────────── */
@@ -104,6 +106,8 @@
   --error-text:     #dc2626;
 
   --shadow-card:    0 1px 3px rgba(0,0,0,0.08);
+  --bg-card-kr:     #fef2f2;
+  --border-kr:      #fecaca;
 }
 
 /* ── Базовые стили ──────────────────────────────────────────────────────── */
@@ -132,12 +136,8 @@ body {
   border-color: var(--border-done);
 }
 .card-kr {
-  background: linear-gradient(135deg, rgba(239,68,68,.18), rgba(220,38,38,.10));
-  border: 1px solid rgba(239,68,68,.30);
-}
-.light .card-kr {
-  background: #fef2f2;
-  border-color: #fecaca;
+  background: var(--bg-card-kr);
+  border: 1px solid var(--border-kr);
 }
 
 .inp {
