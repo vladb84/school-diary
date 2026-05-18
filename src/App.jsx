@@ -66,7 +66,7 @@ const INIT_SUBJS=[
 const INIT_DB={children:[],subjects:INIT_SUBJS,weeklyTemplate:[],dateSchedule:[],homework:[],grades:[],clubs:[]};
 
 // ── Компоненты ────────────────────────────────────────────────────────────────
-const Card=({cls="",onClick,children})=><div className={`card p-4 ${cls}`} onClick={onClick}>{children}</div>;
+const Card=({cls="",style,onClick,children})=><div className={`card p-4 ${cls}`} style={style} onClick={onClick}>{children}</div>;
 const Empty=({txt})=><Card cls="py-10 text-center text-sm" style={{color:"var(--text-muted)"}}>{txt}</Card>;
 const ST=({children})=><p className="text-sm font-medium mb-3" style={{color:"var(--text-secondary)"}}>{children}</p>;
 const Btn=({cls="",...p})=><button className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${cls}`} {...p}/>;
