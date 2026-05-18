@@ -112,13 +112,13 @@ export default function ScheduleTab({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);const d=new Date(sd(activeDate));d.setDate(d.getDate()-7);setActiveDate(ds(d));}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">‹</button>
+        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()-7);setMon(m);const d=new Date(sd(activeDate));d.setDate(d.getDate()-7);setActiveDate(ds(d));}} className="w-9 h-9 rounded-xl card flex items-center justify-center hover:bg-white/5 text-lg" style={{color:"var(--text-secondary)"}}>‹</button>
         <div className="text-center">
-          <p className="text-sm font-semibold text-slate-700">{wLabel}</p>
-          {ds(mon)!==ds(getMonday(new Date()))&&<button onClick={()=>{setMon(getMonday(new Date()));setActiveDate(toDay());}} className="text-xs text-blue-500 hover:underline">← сегодня</button>}
+          <p className="text-sm font-semibold" style={{color:"var(--text-primary)"}}>{wLabel}</p>
+          {ds(mon)!==ds(getMonday(new Date()))&&<button onClick={()=>{setMon(getMonday(new Date()));setActiveDate(toDay());}} className="text-xs text-indigo-400 hover:underline">← сегодня</button>}
           {isOwner&&chTpl.length===0&&<button onClick={seedSchedule} className="text-xs text-emerald-500 hover:underline">✨ Заполнить пример</button>}
         </div>
-        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);const d=new Date(sd(activeDate));d.setDate(d.getDate()+7);setActiveDate(ds(d));}} className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-100 text-lg">›</button>
+        <button onClick={()=>{const m=new Date(mon);m.setDate(m.getDate()+7);setMon(m);const d=new Date(sd(activeDate));d.setDate(d.getDate()+7);setActiveDate(ds(d));}} className="w-9 h-9 rounded-xl card flex items-center justify-center hover:bg-white/5 text-lg" style={{color:"var(--text-secondary)"}}>›</button>
       </div>
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
         {wDates.map((d,i)=>{
@@ -128,9 +128,10 @@ export default function ScheduleTab({
           const hasClub=chCl.some(c=>c.day===DAYS[i]);
           return(
             <button key={i} onClick={()=>setActiveDate(dstr)}
-              className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-blue-500 text-white shadow-md":isToday?"bg-blue-100 text-blue-700 border-2 border-blue-300":"bg-white text-slate-600 hover:bg-slate-100"}`}>
+              className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-indigo-500 text-white shadow-md":isToday?"bg-blue-100 text-blue-700 border-2 border-blue-300":"card hover:bg-white/5"}`}
+              style={(!isActive&&!isToday)?{color:"var(--text-secondary)"}:undefined}>
               <span>{DAYS[i]}</span>
-              <span className={`text-xs font-normal mt-0.5 ${isActive?"text-blue-100":isToday?"text-blue-600":"text-slate-400"}`}>{d.getDate()}</span>
+              <span className={`text-xs font-normal mt-0.5 ${isActive?"text-blue-100":isToday?"text-blue-600":""}`} style={(!isActive&&!isToday)?{color:"var(--text-muted)"}:undefined}>{d.getDate()}</span>
               <div className="flex gap-0.5 mt-1 justify-center">
                 {has&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-blue-200":"bg-blue-400"}`}/>}
                 {hasKR&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-red-300":"bg-red-500"}`}/>}
@@ -142,7 +143,7 @@ export default function ScheduleTab({
       </div>
       <Card cls="mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-700 flex items-center gap-2">
+          <h2 className="font-semibold flex items-center gap-2" style={{color:"var(--text-primary)"}}>
             {DAYS_FULL[activeDayIdx]}, {sd(activeDate).getDate()} {MON[sd(activeDate).getMonth()]}
             {(dateSchedule||[]).some(l=>l.childId===childId&&l.date===activeDate&&l.cancelsSlot!=null)&&(
               <span className="inline-block w-2 h-2 rounded-full bg-red-400 flex-shrink-0" title="Есть изменения в расписании"/>
@@ -150,7 +151,7 @@ export default function ScheduleTab({
           </h2>
           <div className="flex items-center gap-2">
             {activeDate===todayStr&&<span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Сегодня</span>}
-            {isSunday&&<span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Выходной</span>}
+            {isSunday&&<span className="text-xs px-2 py-0.5 rounded-full" style={{background:"var(--bg-card-done)",color:"var(--text-secondary)"}}>Выходной</span>}
           </div>
         </div>
         {(()=>{
@@ -162,7 +163,7 @@ export default function ScheduleTab({
                   <span className="text-sm">🚨</span>
                   <span className="text-sm font-bold text-red-600">КР сегодня:</span>
                   <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>
-                  {h.task&&h.task!=="Контрольная работа"&&<span className="text-xs text-slate-500 flex-1 truncate">{h.task}</span>}
+                  {h.task&&h.task!=="Контрольная работа"&&<span className="text-xs flex-1 truncate" style={{color:"var(--text-secondary)"}}>{h.task}</span>}
                 </div>
               );})}
             </div>
@@ -170,20 +171,20 @@ export default function ScheduleTab({
           return null;
         })()}
         {isSunday ? (
-          <p className="text-slate-400 text-sm text-center py-4">Воскресенье — выходной</p>
+          <p className="text-sm text-center py-4" style={{color:"var(--text-muted)"}}>Воскресенье — выходной</p>
         ) : (()=>{
           const dayClubs=chCl.filter(c=>c.day===activeDay);
           const sortedLessons=[...activeLessons].sort((a,b)=>(+a.lessonNum||99)-(+b.lessonNum||99));
 
           if(sortedLessons.length===0&&dayClubs.length===0)
-            return <p className="text-slate-400 text-sm text-center py-4">Уроков нет</p>;
+            return <p className="text-sm text-center py-4" style={{color:"var(--text-muted)"}}>Уроков нет</p>;
 
           return(
             <div>
               {/* Timeline lessons */}
               {sortedLessons.length>0&&(
                 <div className="relative mb-2">
-                  <div className="absolute left-14 top-0 bottom-0 w-0.5 bg-slate-200"/>
+                  <div className="absolute left-14 top-0 bottom-0 w-0.5" style={{background:"var(--border)"}}/>
                   {sortedLessons.map((l,idx)=>{
                     const s=subj(l.subjectId);
                     const isCancelled=!!l._cancelled;
@@ -219,26 +220,26 @@ export default function ScheduleTab({
                       <div key={l.id}>
                         {hasGap&&(
                           <div className="relative flex items-start mb-4">
-                            <div className="w-12 text-right pr-2 pt-2 text-xs text-slate-400 flex-shrink-0">
+                            <div className="w-12 text-right pr-2 pt-2 text-xs flex-shrink-0" style={{color:"var(--text-muted)"}}>
                               {lessonTimeFor(gapStartNum,shift)}
                             </div>
                             <div className="flex items-center justify-center w-5 flex-shrink-0 pt-3 z-10">
-                              <div className="w-4 h-4 rounded-full border-2 border-dashed border-slate-300 bg-white flex-shrink-0"/>
+                              <div className="w-4 h-4 rounded-full border-2 border-dashed flex-shrink-0" style={{borderColor:"var(--border)",background:"var(--bg-card)"}}/>
                             </div>
-                            <div className="flex-1 ml-3 rounded-xl p-2.5 border border-dashed border-slate-200 bg-slate-50">
-                              <span className="text-xs text-slate-400">🪟 {gapSize===1?"окно":`${gapSize} окна`}</span>
+                            <div className="flex-1 ml-3 rounded-xl p-2.5 border border-dashed" style={{borderColor:"var(--border)",background:"var(--bg-card-done)"}}>
+                              <span className="text-xs" style={{color:"var(--text-ghost)"}}>🪟 {gapSize===1?"окно":`${gapSize} окна`}</span>
                             </div>
                           </div>
                         )}
                         <div className="relative flex items-start mb-4">
-                          <div className={`w-12 text-right pr-2 pt-2 text-xs flex-shrink-0 ${isCancelled?'text-slate-300':'text-slate-400'}`}>
+                          <div className="w-12 text-right pr-2 pt-2 text-xs flex-shrink-0" style={{color:isCancelled?"var(--text-ghost)":"var(--text-muted)"}}>
                             {lessonTimeFor(l.lessonNum,shift)}
                           </div>
                           <div className="flex items-center justify-center w-5 flex-shrink-0 pt-3 z-10">
                             <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{background:dotColor,opacity:isCancelled?0.35:1}}/>
                           </div>
                           <div
-                            className={`flex-1 ml-3 bg-white rounded-xl shadow-sm px-3 py-4 ${isOwner&&!isMovedAway?'cursor-pointer':''} ${(isCancelled||isMovedAway)?'opacity-45':''}`}
+                            className={`flex-1 ml-3 card px-3 py-4 ${isOwner&&!isMovedAway?'cursor-pointer':''} ${(isCancelled||isMovedAway)?'opacity-45 card-done':isExpanded?'card-active':''}`}
                             onClick={()=>{
                               if(!isOwner||isMovedAway)return;
                               setExpandedSubjLesson(null);
@@ -247,56 +248,56 @@ export default function ScheduleTab({
                             }}>
                             {isMovedAway?(
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                {l.lessonNum>0&&<span className="text-xs text-slate-300 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-sm font-medium text-slate-400 line-through flex-1">{s?.name||"?"}</span>
+                                {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-ghost)"}}>{l.lessonNum}</span>}
+                                <span className="text-sm font-medium line-through flex-1" style={{color:"var(--text-muted)"}}>{s?.name||"?"}</span>
                                 <span className="text-xs bg-blue-50 text-blue-400 border border-blue-200 rounded-full px-2 py-0.5">перенесён → {l._moveEntry?.lessonNum} ур.</span>
                               </div>
                             ):isCancelled?(
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                {l.lessonNum>0&&<span className="text-xs text-slate-300 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-sm font-medium text-slate-400 line-through flex-1">{s?.name||"?"}</span>
+                                {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-ghost)"}}>{l.lessonNum}</span>}
+                                <span className="text-sm font-medium line-through flex-1" style={{color:"var(--text-muted)"}}>{s?.name||"?"}</span>
                                 <span className="text-xs bg-red-50 text-red-400 border border-red-200 rounded-full px-2 py-0.5">отменён</span>
                               </div>
                             ):isReplace?(
                               <div className="flex items-center gap-1 flex-wrap">
-                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-xs text-slate-400 line-through">{origSubj?.name||"?"}</span>
-                                <span className="text-slate-300 text-xs">→</span>
-                                <span className="text-sm font-medium text-slate-700 flex-1">{s?.name||"?"}</span>
+                                {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-muted)"}}>{l.lessonNum}</span>}
+                                <span className="text-xs line-through" style={{color:"var(--text-muted)"}}>{origSubj?.name||"?"}</span>
+                                <span className="text-xs" style={{color:"var(--text-ghost)"}}>→</span>
+                                <span className="text-sm font-medium flex-1" style={{color:"var(--text-primary)"}}>{s?.name||"?"}</span>
                                 <span className="text-xs bg-green-50 text-green-600 border border-green-200 rounded-full px-2 py-0.5">замена</span>
                               </div>
                             ):isMove?(
                               <div className="flex items-center gap-1 flex-wrap">
-                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-xs text-slate-400 line-through">{origTime}</span>
-                                <span className="text-slate-300 text-xs">→</span>
-                                <span className="text-sm font-medium text-slate-700 flex-1">{s?.name||"?"}</span>
+                                {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-muted)"}}>{l.lessonNum}</span>}
+                                <span className="text-xs line-through" style={{color:"var(--text-muted)"}}>{origTime}</span>
+                                <span className="text-xs" style={{color:"var(--text-ghost)"}}>→</span>
+                                <span className="text-sm font-medium flex-1" style={{color:"var(--text-primary)"}}>{s?.name||"?"}</span>
                                 <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-full px-2 py-0.5">перенос</span>
                               </div>
                             ):isExtra?(
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600"
+                                {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-muted)"}}>{l.lessonNum}</span>}
+                                <span className="text-sm font-medium flex-1 cursor-pointer hover:text-indigo-400 min-w-0" style={{color:"var(--text-primary)"}}
                                   onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
                                   {s?.name||"?"}
                                 </span>
                                 <span className="text-xs bg-orange-50 text-orange-500 border border-orange-200 rounded-full px-2 py-0.5">разовый</span>
-                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)});}} className="text-slate-300 hover:text-red-400 text-lg ml-1">×</button>}
+                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({dateSchedule:(dateSchedule||[]).filter(x=>x.id!==l.id)});}} className="hover:text-red-400 text-lg ml-1" style={{color:"var(--text-ghost)"}}>×</button>}
                               </div>
                             ):(
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                {l.lessonNum>0&&<span className="text-xs text-slate-400 font-bold w-4 text-center">{l.lessonNum}</span>}
-                                <span className="text-sm font-medium text-slate-700 flex-1 cursor-pointer hover:text-blue-600 min-w-0"
+                                {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-muted)"}}>{l.lessonNum}</span>}
+                                <span className="text-sm font-medium flex-1 cursor-pointer hover:text-indigo-400 min-w-0" style={{color:"var(--text-primary)"}}
                                   onClick={e=>{e.stopPropagation();collapseSubstitution();if(expandedSubjLesson===l.id){setExpandedSubjLesson(null);}else{setExpandedSubjLesson(l.id);}}}>
                                   {s?.name||"?"}
                                 </span>
-                                {lAvg&&<span className="px-2 py-0.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-400">~{lAvg}</span>}
+                                {lAvg&&<span className="px-2 py-0.5 rounded-lg text-sm font-medium" style={{background:"var(--bg-card-done)",color:"var(--text-muted)"}}>~{lAvg}</span>}
                                 {hasKR?<span className="w-2 h-2 rounded-full bg-red-400 inline-block flex-shrink-0"/>:pendHw.length>0?<span className="w-2 h-2 rounded-full bg-orange-400 inline-block flex-shrink-0"/>:null}
-                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id),dateSchedule:(dateSchedule||[]).filter(x=>!(x.childId===childId&&x.cancelsSlot===l.lessonNum&&x.day===activeDay))});collapseSubstitution();}} className="text-slate-300 hover:text-red-400 text-lg ml-auto">×</button>}
+                                {isOwner&&<button onClick={e=>{e.stopPropagation();upd({weeklyTemplate:weeklyTemplate.filter(x=>x.id!==l.id),dateSchedule:(dateSchedule||[]).filter(x=>!(x.childId===childId&&x.cancelsSlot===l.lessonNum&&x.day===activeDay))});collapseSubstitution();}} className="hover:text-red-400 text-lg ml-auto" style={{color:"var(--text-ghost)"}}>×</button>}
                               </div>
                             )}
                             {isOwner&&isExpanded&&!isCancelled&&!isSubstitution&&(
-                              <div className="mt-2 pt-2 border-t border-slate-100">
+                              <div className="mt-2 pt-2 border-t border-[var(--border)]">
                                 {subAction===null&&(
                                   <div className="flex gap-1.5 flex-wrap">
                                     <button onClick={e=>{e.stopPropagation();doCancel(l);}}
@@ -308,7 +309,7 @@ export default function ScheduleTab({
                                       🔄 Заменить
                                     </button>
                                     <button onClick={e=>{e.stopPropagation();setSubAction('move');}}
-                                      className="text-xs px-2.5 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">
+                                      className="text-xs px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-400 hover:bg-indigo-100">
                                       ⏱ Перенести
                                     </button>
                                   </div>
@@ -316,7 +317,7 @@ export default function ScheduleTab({
                                 {subAction==='replace'&&(
                                   <div className="flex gap-2 items-center" onClick={e=>e.stopPropagation()}>
                                     <select
-                                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                      className="inp flex-1 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                       value={subReplaceSubj}
                                       onChange={e=>setSubReplaceSubj(e.target.value)}>
                                       <option value="">Выберите предмет...</option>
@@ -325,62 +326,62 @@ export default function ScheduleTab({
                                     <button onClick={()=>doReplace(l)}
                                       className="bg-green-500 text-white rounded-lg px-3 py-1.5 text-sm">✓</button>
                                     <button onClick={e=>{e.stopPropagation();setSubAction(null);}}
-                                      className="text-slate-400 text-sm px-2">×</button>
+                                      className="text-sm px-2" style={{color:"var(--text-muted)"}}>×</button>
                                   </div>
                                 )}
                                 {subAction==='move'&&(
                                   <div className="flex gap-2 items-center" onClick={e=>e.stopPropagation()}>
                                     <select
-                                      className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                      className="inp flex-1 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                       value={subMoveSlot}
                                       onChange={e=>setSubMoveSlot(e.target.value)}>
                                       <option value="">Выберите слот...</option>
                                       {freeSlots.map(n=><option key={n} value={n}>{n} — {lessonTimeFor(n,shift)}</option>)}
                                     </select>
                                     <button onClick={()=>doMove(l)}
-                                      className="bg-blue-500 text-white rounded-lg px-3 py-1.5 text-sm">✓</button>
+                                      className="bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-sm">✓</button>
                                     <button onClick={e=>{e.stopPropagation();setSubAction(null);}}
-                                      className="text-slate-400 text-sm px-2">×</button>
+                                      className="text-sm px-2" style={{color:"var(--text-muted)"}}>×</button>
                                   </div>
                                 )}
                               </div>
                             )}
                             {isOwner&&isExpanded&&isSubstitution&&(
-                              <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                              <div className="mt-2 pt-2 border-t border-[var(--border)]" onClick={e=>e.stopPropagation()}>
                                 <button onClick={()=>doUndo(l)}
-                                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
+                                  className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-white/5" style={{background:"var(--bg-card-done)",color:"var(--text-secondary)"}}>
                                   ↩ Восстановить
                                 </button>
                               </div>
                             )}
                             {isOwner&&isExpanded&&isCancelled&&(
-                              <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                              <div className="mt-2 pt-2 border-t border-[var(--border)]" onClick={e=>e.stopPropagation()}>
                                 <button onClick={()=>{const ce=(dateSchedule||[]).find(x=>x.cancelsSlot===l.lessonNum&&x.date===activeDate&&x.childId===childId);if(ce)doUndo(ce);}}
-                                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
+                                  className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-white/5" style={{background:"var(--bg-card-done)",color:"var(--text-secondary)"}}>
                                   ↩ Восстановить
                                 </button>
                               </div>
                             )}
                             {isMovedAway&&l._moveEntry&&isOwner&&(
-                              <div className="mt-2 pt-2 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                              <div className="mt-2 pt-2 border-t border-[var(--border)]" onClick={e=>e.stopPropagation()}>
                                 <button onClick={()=>doUndo(l._moveEntry)}
-                                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100">
+                                  className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)] hover:bg-white/5" style={{background:"var(--bg-card-done)",color:"var(--text-secondary)"}}>
                                   ↩ Восстановить
                                 </button>
                               </div>
                             )}
                             {expandedSubjLesson===l.id&&!isCancelled&&!isMovedAway&&(
-                              <div className="mt-3 pt-3 border-t border-slate-100" onClick={e=>e.stopPropagation()}>
+                              <div className="mt-3 pt-3 border-t border-[var(--border)]" onClick={e=>e.stopPropagation()}>
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{s?.name}</span>
+                                  <span className="text-xs font-semibold uppercase tracking-wide" style={{color:"var(--text-muted)"}}>{s?.name}</span>
                                   <button onClick={()=>{if(s){setSelSubj(s.id);setTab(3);}}}
-                                    className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-full hover:bg-blue-100 transition-all">
+                                    className="text-xs border border-indigo-500 text-indigo-400 px-2.5 py-1 rounded-full hover:bg-white/5 transition-all" style={{background:"var(--bg-tag)"}}>
                                     📊 Статистика
                                   </button>
                                 </div>
                                 {(()=>{
                                   const recentGr=sjGrades(l.subjectId||'').slice(0,6);
-                                  if(recentGr.length===0)return <p className="text-xs text-slate-400">Оценок пока нет</p>;
+                                  if(recentGr.length===0)return <p className="text-xs" style={{color:"var(--text-muted)"}}>Оценок пока нет</p>;
                                   return <div className="flex flex-wrap gap-1">{recentGr.map(g=><GBadge key={g.id} v={g.value} type={g.type}/>)}</div>;
                                 })()}
                                 {pendHw.length>0&&(
@@ -390,7 +391,7 @@ export default function ScheduleTab({
                                   </button>
                                 )}
                                 <button onClick={()=>{setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");setExpandedSubjLesson(null);}}
-                                  className="mt-2 w-full text-xs bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all text-left">
+                                  className="mt-2 w-full text-xs border border-[var(--border)] px-3 py-1.5 rounded-lg hover:bg-white/5 hover:border-indigo-500 hover:text-indigo-400 transition-all text-left" style={{background:"var(--bg-card-done)",color:"var(--text-secondary)"}}>
                                   ✏️ Записать задание
                                 </button>
                               </div>
@@ -400,16 +401,16 @@ export default function ScheduleTab({
                                 {hwChips.map(hw=>(
                                   <div key={hw.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${hw.done?"bg-green-50 border-green-200 text-green-700 line-through":"bg-blue-50 border-blue-200 text-blue-700"}`}>
                                     <span className="max-w-[120px] truncate">{hw.task?.slice(0,25)}</span>
-                                    {isOwner&&<button onClick={e=>{e.stopPropagation();const patch={homework:(homework||[]).filter(x=>x.id!==hw.id)};if(hw.grade)patch.grades=[...(grades||[]),{id:uid(),childId,subjectId:hw.subjectId,value:hw.grade,date:hw.date||'',type:'hw',comment:''}];upd(patch);}} className="text-slate-400 hover:text-red-400 ml-0.5">×</button>}
+                                    {isOwner&&<button onClick={e=>{e.stopPropagation();const patch={homework:(homework||[]).filter(x=>x.id!==hw.id)};if(hw.grade)patch.grades=[...(grades||[]),{id:uid(),childId,subjectId:hw.subjectId,value:hw.grade,date:hw.date||'',type:'hw',comment:''}];upd(patch);}} className="hover:text-red-400 ml-0.5" style={{color:"var(--text-muted)"}}>×</button>}
                                   </div>
                                 ))}
-                                {!showQuickForm&&<button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");setExpandedSubjLesson(null);}} className="w-5 h-5 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 text-xs flex items-center justify-center transition-all">+</button>}
+                                {!showQuickForm&&<button onClick={e=>{e.stopPropagation();setHwQuickForm({subjectId:l.subjectId,date:activeDate});setHwQuickTask("");setExpandedSubjLesson(null);}} className="w-5 h-5 rounded-full border border-dashed hover:border-indigo-400 hover:text-indigo-400 text-xs flex items-center justify-center transition-all" style={{borderColor:"var(--border)",color:"var(--text-muted)"}}>+</button>}
                               </div>
                             )}
                             {!isCancelled&&showQuickForm&&(
                               <div className="mt-2 flex gap-2">
                                 <input autoFocus
-                                  className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                  className="inp flex-1 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                   placeholder="Что задали?"
                                   value={hwQuickTask}
                                   onChange={e=>setHwQuickTask(e.target.value)}
@@ -417,8 +418,8 @@ export default function ScheduleTab({
                                     if(e.key==="Enter"&&hwQuickTask.trim()){addHw(l.subjectId);}
                                     if(e.key==="Escape"){setHwQuickForm(null);setHwQuickTask("");}
                                   }}/>
-                                <button onClick={()=>addHw(l.subjectId)} className="bg-blue-500 text-white rounded-lg px-2 py-1.5 text-sm">+</button>
-                                <button onClick={()=>{setHwQuickForm(null);setHwQuickTask("");}} className="text-slate-400 text-sm px-2">×</button>
+                                <button onClick={()=>addHw(l.subjectId)} className="bg-indigo-500 text-white rounded-lg px-2 py-1.5 text-sm">+</button>
+                                <button onClick={()=>{setHwQuickForm(null);setHwQuickTask("");}} className="text-sm px-2" style={{color:"var(--text-muted)"}}>×</button>
                               </div>
                             )}
                           </div>
@@ -431,10 +432,10 @@ export default function ScheduleTab({
               {/* Clubs in timeline style */}
               {dayClubs.length>0&&(
                 <div className="relative">
-                  <div className="absolute left-14 top-0 bottom-0 w-0.5 bg-slate-200"/>
+                  <div className="absolute left-14 top-0 bottom-0 w-0.5" style={{background:"var(--border)"}}/>
                   {dayClubs.map(c=>(
                     <div key={c.id} className="relative flex items-start mb-4">
-                      <div className="w-12 text-right pr-2 pt-2 text-xs text-slate-400 flex-shrink-0">
+                      <div className="w-12 text-right pr-2 pt-2 text-xs flex-shrink-0" style={{color:"var(--text-muted)"}}>
                         {c.time||""}
                       </div>
                       <div className="flex items-center justify-center w-5 flex-shrink-0 pt-3 z-10">
@@ -445,8 +446,8 @@ export default function ScheduleTab({
                         <div className="flex items-center gap-2">
                           <span className="text-xs">🎯</span>
                           <span className="text-sm font-medium text-violet-800 flex-1">{c.name}</span>
-                          {c.comment&&<span className="text-slate-400 text-xs" title={c.comment}>💬</span>}
-                          {isOwner&&<button onClick={e=>{e.stopPropagation();upd({clubs:clubs.filter(x=>x.id!==c.id)});}} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+                          {c.comment&&<span className="text-xs" style={{color:"var(--text-muted)"}} title={c.comment}>💬</span>}
+                          {isOwner&&<button onClick={e=>{e.stopPropagation();upd({clubs:clubs.filter(x=>x.id!==c.id)});}} className="hover:text-red-400 text-lg" style={{color:"var(--text-ghost)"}}>×</button>}
                         </div>
                       </div>
                     </div>
@@ -469,13 +470,13 @@ export default function ScheduleTab({
               </Sel>
               <div className="flex gap-2 items-end">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-400">№ урока</label>
+                  <label className="text-xs" style={{color:"var(--text-muted)"}}>№ урока</label>
                   <Sel cls="w-32" value={lessonForm.lessonNum} onChange={e=>{const n=e.target.value;setLessonForm(p=>({...p,lessonNum:n,time:lessonTimeFor(+n,shift)}));}}>
                     {LNS.map(n=><option key={n} value={n}>{n<=0?`${n} (доп.)`:`${n} — ${lessonTimeFor(n,shift)}`}</option>)}
                   </Sel>
                 </div>
                 <div className="flex flex-col gap-1 flex-1">
-                  <label className="text-xs text-slate-400">Время</label>
+                  <label className="text-xs" style={{color:"var(--text-muted)"}}>Время</label>
                   <Inp cls="w-full" placeholder="08:00" inputMode="numeric" maxLength={5}
                     value={lessonForm.time}
                     onChange={e=>setLessonForm(p=>({...p,time:maskTime(e.target.value)}))}/>
@@ -483,7 +484,7 @@ export default function ScheduleTab({
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={lessonForm.repeat} onChange={e=>setLessonForm(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
-                <span className="text-sm text-slate-600">Повторять каждую неделю</span>
+                <span className="text-sm" style={{color:"var(--text-secondary)"}}>Повторять каждую неделю</span>
               </label>
               <Btn onClick={()=>{
                 if(!lessonForm.subjectId)return;
@@ -492,7 +493,7 @@ export default function ScheduleTab({
                 if(lessonForm.repeat)upd({subjects:ns,weeklyTemplate:[...weeklyTemplate,{id:uid(),childId,subjectId:sid,day:activeDay,lessonNum:+lessonForm.lessonNum,time:lessonForm.time}]});
                 else upd({subjects:ns,dateSchedule:[...(dateSchedule||[]),{id:uid(),childId,date:activeDate,subjectId:sid,lessonNum:+lessonForm.lessonNum,time:lessonForm.time,type:'extra'}]});
                 setLessonForm({subjectId:"",lessonNum:"1",time:lessonTimeFor(1,shift),repeat:true});
-              }} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
+              }} cls="w-full bg-indigo-500 text-white hover:bg-indigo-600">+ Добавить</Btn>
               {!lessonForm.repeat&&<p className="text-xs text-purple-500 bg-purple-50 rounded-lg px-3 py-1.5">📌 Только на {sd(activeDate).getDate()} {MON[sd(activeDate).getMonth()]}</p>}
             </div>
           )}
@@ -504,7 +505,7 @@ export default function ScheduleTab({
           {showAddClub&&(
             <div className="mt-3 space-y-2">
               <Inp cls="w-full" placeholder="Название" value={clubForm.name} onChange={e=>setClubForm(p=>({...p,name:e.target.value}))}/>
-              <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" rows={2} placeholder="Комментарий (необязательно)"
+              <textarea className="inp rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" rows={2} placeholder="Комментарий (необязательно)"
                 value={clubForm.comment||""} onChange={e=>setClubForm(p=>({...p,comment:e.target.value}))}/>
               <div className="flex gap-2">
                 <Sel cls="flex-1" value={clubForm.day} onChange={e=>setClubForm(p=>({...p,day:e.target.value}))}>
@@ -516,14 +517,14 @@ export default function ScheduleTab({
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={clubForm.repeat!==false} onChange={e=>setClubForm(p=>({...p,repeat:e.target.checked}))} className="w-4 h-4 accent-blue-500"/>
-                <span className="text-sm text-slate-600">Повторять каждую неделю</span>
+                <span className="text-sm" style={{color:"var(--text-secondary)"}}>Повторять каждую неделю</span>
               </label>
               <Btn onClick={()=>{
                 if(!clubForm.name.trim())return;
                 upd({clubs:[...clubs,{id:uid(),childId,...clubForm,done:false}]});
                 setClubForm({name:"",day:activeDay,time:"",comment:"",repeat:true});
                 setShowAddClub(false);
-              }} cls="w-full bg-blue-500 text-white hover:bg-blue-600">+ Добавить</Btn>
+              }} cls="w-full bg-indigo-500 text-white hover:bg-indigo-600">+ Добавить</Btn>
             </div>
           )}
         </Card>
