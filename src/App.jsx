@@ -11,10 +11,14 @@ import { SCHEDULE_BY_GRADE } from "./scheduleData";
 const DAYS=["Пн","Вт","Ср","Чт","Пт","Сб"];
 const DAYS_FULL=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
 const MON=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
-const GC={"5":"bg-green-100 text-green-700","4":"bg-blue-100 text-blue-700","3":"bg-yellow-100 text-yellow-700","2":"bg-red-100 text-red-700"};
-const SC=["bg-blue-100 text-blue-800","bg-purple-100 text-purple-800","bg-emerald-100 text-emerald-800","bg-amber-100 text-amber-800","bg-pink-100 text-pink-800","bg-indigo-100 text-indigo-800","bg-orange-100 text-orange-800","bg-teal-100 text-teal-800","bg-red-100 text-red-800","bg-cyan-100 text-cyan-800","bg-lime-100 text-lime-800","bg-rose-100 text-rose-800","bg-violet-100 text-violet-800","bg-sky-100 text-sky-800","bg-green-100 text-green-800"];
-const CBG=["bg-blue-500","bg-pink-500","bg-emerald-500","bg-violet-500","bg-orange-500","bg-teal-500"];
-const GC2={"5":{bg:"#EAF3DE",tc:"#3B6D11"},"4":{bg:"#E6F1FB",tc:"#185FA5"},"3":{bg:"#FAEEDA",tc:"#854F0B"},"2":{bg:"#FCEBEB",tc:"#A32D2D"}};
+// GC: grade value → CSS class (используется в GChip, GBadge, GPicker)
+const GC={"5":"grade-chip-5","4":"grade-chip-4","3":"grade-chip-3","2":"grade-chip-2"};
+// SC: subject color index → CSS class (15 цветов, индекс s.c % 15)
+const SC_LEN=15;
+// CBG: child avatar color index → CSS class
+const CBG=["cbg-0","cbg-1","cbg-2","cbg-3","cbg-4","cbg-5"];
+// GC2: grade value → CSS class для ячеек статистики
+const GC2={"5":"gc-5","4":"gc-4","3":"gc-3","2":"gc-2"};
 const DEF_ORDER=["last","subjs","hw"];
 const DEF_COLL=["last","subjs","hw"];
 
@@ -36,7 +40,7 @@ const fmtDate=s=>{if(!s)return"";const p=s.split("-");return p.length===3?`${p[2
 const isKR=t=>t==="test";
 const gradeIcon=t=>isKR(t)?"📋":t==="class"?"🙋":"✏️";
 const bcAvg=a=>{const n=Math.round(a||0);if(n>=5)return"#1D9E75";if(n>=4)return"#378ADD";if(n>=3)return"#EF9F27";return"#E24B4A";};
-const gcl=v=>GC2[v]||{bg:"#f1f5f9",tc:"#64748b"};
+const gcl=v=>GC2[v]||"gc-x";
 
 const SUBJECTS_BY_GRADE={
   1:["Русский язык","Математика","Литературное чтение","Окружающий мир","Музыка","ИЗО","Физкультура","Технология"],
@@ -62,25 +66,25 @@ const INIT_SUBJS=[
 const INIT_DB={children:[],subjects:INIT_SUBJS,weeklyTemplate:[],dateSchedule:[],homework:[],grades:[],clubs:[]};
 
 // ── Компоненты ────────────────────────────────────────────────────────────────
-const Card=({cls="",onClick,children})=><div className={`bg-white rounded-2xl shadow-sm p-4 ${cls}`} onClick={onClick}>{children}</div>;
-const Empty=({txt})=><Card cls="py-10 text-center text-slate-400 text-sm">{txt}</Card>;
-const ST=({children})=><p className="text-sm font-medium text-slate-600 mb-3">{children}</p>;
+const Card=({cls="",onClick,children})=><div className={`card p-4 ${cls}`} onClick={onClick}>{children}</div>;
+const Empty=({txt})=><Card cls="py-10 text-center text-sm" style={{color:"var(--text-muted)"}}>{txt}</Card>;
+const ST=({children})=><p className="text-sm font-medium mb-3" style={{color:"var(--text-secondary)"}}>{children}</p>;
 const Btn=({cls="",...p})=><button className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${cls}`} {...p}/>;
-const Inp=({cls="",...p})=><input className={`border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${cls}`} {...p}/>;
-const Sel=({cls="",...p})=><select className={`border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${cls}`} {...p}/>;
+const Inp=({cls="",...p})=><input className={`inp rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${cls}`} {...p}/>;
+const Sel=({cls="",...p})=><select className={`inp rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${cls}`} {...p}/>;
 const Loader=({text="Загрузка..."})=>(
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-    <p className="text-slate-400 animate-pulse text-lg">{text}</p>
+  <div className="min-h-screen flex items-center justify-center" style={{background:"var(--bg-gradient)"}}>
+    <p className="animate-pulse text-lg" style={{color:"var(--text-muted)"}}>{text}</p>
   </div>
 );
 const CollapseBtn=({open,onToggle,label})=>(
-  <button onClick={onToggle} className="w-full flex items-center justify-between text-sm font-medium text-slate-600 text-left">
+  <button onClick={onToggle} className="w-full flex items-center justify-between text-sm font-medium text-left" style={{color:"var(--text-secondary)"}}>
     <span>{label}</span>
-    <span className="text-slate-400 text-lg flex-shrink-0" style={{transform:open?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
+    <span className="text-lg flex-shrink-0" style={{color:"var(--text-muted)",transform:open?"rotate(0deg)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
   </button>
 );
 const GBadge=({v,type=""})=>(
-  <span className={`px-2 py-0.5 rounded-lg text-sm font-bold inline-flex items-center gap-1 ${GC[v]||"bg-slate-100 text-slate-600"} ${isKR(type)?"ring-2 ring-current":""}`}>
+  <span className={`grade-chip ${GC[v]||"grade-chip-none"} ${isKR(type)?"ring-2 ring-current":""}`}>
     <span className="text-xs">{gradeIcon(type)}</span>{v}
   </span>
 );
@@ -88,7 +92,8 @@ const GPicker=({value,onChange})=>(
   <div className="flex gap-1">
     {["5","4","3","2"].map(g=>(
       <button key={g} onClick={()=>onChange(value===g?null:g)}
-        className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-all ${value===g?(GC[g]||"")+" border-current ring-1 ring-offset-1 ring-current":"bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400"}`}>{g}</button>
+        className={`w-8 h-8 rounded-lg text-sm font-bold border-2 transition-all ${value===g?(GC[g]||"grade-chip-none")+" border-current ring-1 ring-offset-1 ring-current":"border-[var(--border)] hover:border-[var(--accent)]"}`}
+        style={value!==g?{background:"var(--bg-card)",color:"var(--text-secondary)"}:{}}>{g}</button>
     ))}
   </div>
 );
@@ -97,7 +102,7 @@ const GChip=({g,isOwner,expandedGradeId,setExpandedGradeId,chgGrade,delGrade,edi
   const isE=expandedGradeId===g.id;
   return(
     <div className="relative">
-      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${GC[g.value]||"bg-slate-100"} ${isKR(g.type)?"ring-2 ring-current":""} ${isOwner?"cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-current":"cursor-default"}`}
+      <div className={`grade-chip text-xs ${GC[g.value]||"grade-chip-none"} ${isKR(g.type)?"ring-2 ring-current":""} ${isOwner?"cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-current":"cursor-default"}`}
         onClick={e=>{e.stopPropagation();isOwner&&setExpandedGradeId(isE?null:g.id);}}>
         <span className="text-xs">{gradeIcon(g.type)}</span>
         <span className="font-bold text-sm">{g.value}</span>
@@ -105,44 +110,46 @@ const GChip=({g,isOwner,expandedGradeId,setExpandedGradeId,chgGrade,delGrade,edi
         {isOwner&&<span className="opacity-40 ml-0.5">✎</span>}
       </div>
       {isE&&isOwner&&(
-        <div className="absolute z-20 top-full mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-3 min-w-max">
-          <p className="text-xs text-slate-400 mb-2">Изменить оценку</p>
+        <div className="absolute z-20 top-full mt-1 left-0 card rounded-xl shadow-lg p-3 min-w-max" style={{background:"var(--bg-card)",backdropFilter:"blur(12px)"}}>
+          <p className="text-xs mb-2" style={{color:"var(--text-muted)"}}>Изменить оценку</p>
           <GPicker value={g.value} onChange={v=>chgGrade(g,v)}/>
           <div className="mt-2">
-            <p className="text-xs text-slate-400 mb-1.5">Дата</p>
-            <input type="date" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+            <p className="text-xs mb-1.5" style={{color:"var(--text-muted)"}}>Дата</p>
+            <input type="date" className="inp w-full rounded-lg px-2 py-1.5 text-xs focus:outline-none"
               value={g.date||""} onChange={e=>{if(g.type==="hw")return;upd({grades:grades.map(x=>x.id===g.id?{...x,date:e.target.value}:x)});}}/>
           </div>
           {g.type!=="hw"&&(
             <div className="mt-2">
-              <p className="text-xs text-slate-400 mb-1.5">Тип</p>
+              <p className="text-xs mb-1.5" style={{color:"var(--text-muted)"}}>Тип</p>
               <div className="flex gap-1">
                 {[["class","🙋 Устно"],["test","📋 КР"],["hw","✏️ Письменно"]].map(([val,lbl])=>(
                   <button key={val} onClick={()=>upd({grades:grades.map(x=>x.id===g.id?{...x,type:val}:x)})}
-                    className={"px-2 py-1 rounded-lg text-xs border transition-all "+(g.type===val?"bg-blue-500 text-white border-blue-500":"bg-white text-slate-500 border-slate-200 hover:border-blue-300")}>{lbl}</button>
+                    className={"px-2 py-1 rounded-lg text-xs border transition-all "+(g.type===val?"bg-indigo-500 text-white border-indigo-500":"border-[var(--border)] hover:border-indigo-400")}
+                    style={g.type!==val?{background:"var(--bg-card)",color:"var(--text-secondary)"}:{}}>{lbl}</button>
                 ))}
               </div>
             </div>
           )}
           <div className="mt-2">
-            <p className="text-xs text-slate-400 mb-1.5">Комментарий</p>
-            <textarea className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none resize-none" rows={2} placeholder="Заметка к оценке..."
+            <p className="text-xs mb-1.5" style={{color:"var(--text-muted)"}}>Комментарий</p>
+            <textarea className="inp w-full rounded-lg px-2 py-1.5 text-xs focus:outline-none resize-none" rows={2} placeholder="Заметка к оценке..."
               value={editC["gr_"+g.id]??(g.comment||"")} onChange={e=>setEditC(p=>({...p,["gr_"+g.id]:e.target.value}))}/>
             <button onClick={()=>{upd({grades:grades.map(x=>x.id===g.id?{...x,comment:editC["gr_"+g.id]??(g.comment||"")}:x)});setEditC(p=>({...p,["gr_"+g.id]:undefined}));}}
-              className="mt-1 w-full text-xs bg-blue-50 text-blue-500 py-1 border border-blue-100 rounded-lg hover:bg-blue-100">Сохранить</button>
+              className="mt-1 w-full text-xs py-1 border rounded-lg transition-all" style={{background:"var(--bg-tag)",color:"var(--accent-text)",borderColor:"var(--border-active)"}}>Сохранить</button>
           </div>
-          <button onClick={e=>{e.stopPropagation();delGrade(g);}} className="mt-2 w-full text-xs text-red-400 py-1 border border-red-100 rounded-lg hover:bg-red-50">Удалить</button>
+          <button onClick={e=>{e.stopPropagation();delGrade(g);}} className="mt-2 w-full text-xs py-1 border rounded-lg transition-all" style={{color:"var(--danger-text)",borderColor:"var(--danger-text)",opacity:"0.7"}}>Удалить</button>
         </div>
       )}
     </div>
   );
 };
 
-const SBadge=({sid,subj,sc})=>{const s=subj(sid);return <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>;};
+const SBadge=({sid,subj,sc})=>{const s=subj(sid);return <span className={`sbadge ${sc(s)}`}>{s?.name||"?"}</span>;};
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App(){
   const [user,setUser]=useState(undefined);
+  const [theme,setTheme]=useState(()=>localStorage.getItem('theme')||'dark');
   const [userRec,setUserRec]=useState(null);
   const [dbData,setDbData]=useState(null);
   const [step,setStep]=useState("loading");
@@ -183,6 +190,13 @@ export default function App(){
   const [pendingRemoveId,setPendingRemoveId]=useState(null);
   const [previewChild,setPreviewChild]=useState(false);
   const [saveError,setSaveError]=useState(false);
+
+  useEffect(()=>{
+    const el=document.documentElement;
+    el.classList.remove('dark','light');
+    el.classList.add(theme);
+    localStorage.setItem('theme',theme);
+  },[theme]);
 
   useEffect(()=>{
     getRedirectResult(auth).then(result=>{
@@ -452,7 +466,7 @@ export default function App(){
   const isOwner=realOwner&&!previewChild;
   const cbg=idx=>CBG[(idx||0)%CBG.length];
   const subj=id=>subjects.find(s=>s.id===id);
-  const sc=s=>s?SC[s.c%SC.length]:"bg-slate-100 text-slate-600";
+  const sc=s=>s?`sbadge sbadge-${s.c%SC_LEN}`:"sbadge gc-x";
   const upd=patch=>save(patch);
   const todayStr=toDay();
 
