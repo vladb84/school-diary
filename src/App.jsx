@@ -433,7 +433,7 @@ export default function App(){
   if(step==="setup")return(
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
-        <div className="text-center mb-6"><div className="text-5xl mb-3">👋</div><h1 className="text-xl font-bold text-slate-800">Добро пожаловать!</h1><p className="text-slate-400 text-sm mt-1">{user.email||user.phoneNumber}</p></div>
+        <div className="text-center mb-6"><div className="text-5xl mb-3">👋</div><h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Добро пожаловать!</h1><p className="text-slate-400 text-sm mt-1">{user.email||user.phoneNumber}</p></div>
         <div className="space-y-3">
           <button onClick={createFamily} disabled={codeLoading} className="w-full bg-blue-500 text-white rounded-xl px-6 py-4 text-sm font-medium hover:bg-blue-600 disabled:opacity-60 transition-all">{codeLoading?"Создаём...":"👨‍👩‍👧‍👦 Я родитель — создать семью"}</button>
           <button onClick={()=>setStep("join")} className="w-full bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-4 text-sm font-medium hover:bg-slate-50 transition-all">🎒 Я ребёнок — войти по коду</button>
@@ -447,7 +447,7 @@ export default function App(){
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
         <button onClick={()=>setStep("setup")} className="text-slate-400 text-sm mb-4 hover:text-slate-600">← Назад</button>
-        <div className="text-center mb-6"><div className="text-5xl mb-3">🔑</div><h1 className="text-xl font-bold text-slate-800">Войти в семью</h1><p className="text-slate-400 text-sm mt-1">Попроси родителя назвать код</p></div>
+        <div className="text-center mb-6"><div className="text-5xl mb-3">🔑</div><h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Войти в семью</h1><p className="text-slate-400 text-sm mt-1">Попроси родителя назвать код</p></div>
         <input className={`w-full border-2 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] uppercase focus:outline-none mb-2 ${codeErr?"border-red-400 text-red-500":"border-slate-200 focus:border-blue-400 text-slate-800"}`}
           placeholder="ABC123" maxLength={6} value={codeInput} autoFocus
           onChange={e=>{setCodeInput(e.target.value.toUpperCase());setCodeErr("");}}
@@ -473,7 +473,7 @@ export default function App(){
   if(step==="select")return(
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-slate-700 mb-2">👋 Привет!</h1>
+        <h1 className="text-4xl font-bold mb-2" style={{color:"var(--text-primary)"}}>👋 Привет!</h1>
         <p className="text-slate-400">Выбери свой профиль</p>
         <p className="text-xs text-slate-300 mt-1">{user.email||user.phoneNumber}</p>
         {isOwner&&<span className="inline-block mt-2 bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full">👨‍👩‍👧‍👦 Родитель</span>}
@@ -705,7 +705,7 @@ export default function App(){
                 {showAddClub&&(
                   <div className="mt-3 space-y-2">
                     <Inp cls="w-full" placeholder="Название" value={clubForm.name} onChange={e=>setClubForm(p=>({...p,name:e.target.value}))}/>
-                    <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" rows={2} placeholder="Комментарий (необязательно)"
+                    <textarea className="inp rounded-lg px-2 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" rows={2} placeholder="Комментарий (необязательно)"
                       value={clubForm.comment||""} onChange={e=>setClubForm(p=>({...p,comment:e.target.value}))}/>
                     <div className="flex gap-2">
                       <Sel cls="flex-1" value={clubForm.day} onChange={e=>setClubForm(p=>({...p,day:e.target.value}))}>
