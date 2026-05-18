@@ -256,7 +256,7 @@ export default function ScheduleTab({
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-ghost)"}}>{l.lessonNum}</span>}
                                 <span className="text-sm font-medium line-through flex-1" style={{color:"var(--text-muted)"}}>{s?.name||"?"}</span>
-                                <span className="text-xs bg-red-50 text-red-400 border border-red-200 rounded-full px-2 py-0.5">отменён</span>
+                                <span className="text-xs border rounded-full px-2 py-0.5" style={{background:"rgba(239,68,68,0.15)",color:"var(--danger-text)",borderColor:"var(--danger-text)"}}>отменён</span>
                               </div>
                             ):isReplace?(
                               <div className="flex items-center gap-1 flex-wrap">
@@ -264,7 +264,7 @@ export default function ScheduleTab({
                                 <span className="text-xs line-through" style={{color:"var(--text-muted)"}}>{origSubj?.name||"?"}</span>
                                 <span className="text-xs" style={{color:"var(--text-ghost)"}}>→</span>
                                 <span className="text-sm font-medium flex-1" style={{color:"var(--text-primary)"}}>{s?.name||"?"}</span>
-                                <span className="text-xs bg-green-50 text-green-600 border border-green-200 rounded-full px-2 py-0.5">замена</span>
+                                <span className="text-xs border rounded-full px-2 py-0.5" style={{background:"rgba(34,197,94,0.15)",color:"var(--success-text)",borderColor:"var(--success)"}}>замена</span>
                               </div>
                             ):isMove?(
                               <div className="flex items-center gap-1 flex-wrap">
