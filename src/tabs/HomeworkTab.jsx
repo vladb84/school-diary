@@ -41,29 +41,30 @@ export default function HomeworkTab({
     const isHighlighted = highlightHw===h.id;
     return (
     <div ref={isHighlighted?highlightRef:null}>
-    <Card key={h.id} cls={`${h.done?"opacity-70":""} ${h.hwType==="kr"?"border-2 border-red-300":""} ${isHighlighted?"ring-2 ring-orange-400 ring-offset-1":""} ${cls}`}>
+    <Card key={h.id} cls={`${h.done?"opacity-70":""} ${h.hwType==="kr"?"card-kr":""} ${isHighlighted?"ring-2 ring-orange-400 ring-offset-1":""} ${cls}`}>
       <div className="flex items-start gap-3">
         <button onClick={()=>upd({homework:homework.map(x=>x.id===h.id?{...x,done:!x.done}:x)})}
-          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"border-slate-300 hover:border-green-400"}`}>
+          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs ${h.done?"bg-green-500 border-green-500 text-white":"hover:border-green-400"}`}
+          style={!h.done?{borderColor:"var(--border-active)"}:{}}>
           {h.done&&"✓"}
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             {h.hwType==="kr"&&<span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg border border-red-200">🚨 КР</span>}
             <SBadge sid={h.subjectId} subj={subj} sc={sc}/>
-            {h.date&&<span className="text-xs text-slate-400">до {fmtDate(h.date)}</span>}
+            {h.date&&<span className="text-xs" style={{color:"var(--text-muted)"}}>до {fmtDate(h.date)}</span>}
             {h.grade&&(isOwner?<GChip g={{id:"hw_"+h.id,hwId:h.id,value:h.grade,date:h.date||"",type:"hw"}} isOwner={isOwner} expandedGradeId={expandedGradeId} setExpandedGradeId={setExpandedGradeId} chgGrade={chgGrade} delGrade={delGrade} editC={editC} setEditC={setEditC} upd={upd} grades={grades}/>:<GBadge v={h.grade} type="hw"/>)}
           </div>
-          <p className={`text-sm text-slate-700 ${h.done?"line-through":""}`}>{h.task}</p>
-          {h.comment&&(<div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2"><p className="text-xs text-amber-600 font-medium">💬 Родитель:</p><p className="text-xs text-amber-800 mt-0.5">{h.comment}</p></div>)}
+          <p className={`text-sm ${h.done?"line-through":""}`} style={{color:"var(--text-primary)"}}>{h.task}</p>
+          {h.comment&&(<div className="comment-block mt-2"><p className="comment-title font-medium">💬 Родитель:</p><p className="comment-text mt-0.5">{h.comment}</p></div>)}
           {isOwner&&(
             <div className="mt-3 space-y-2">
               <div className="flex items-center gap-2">
                 <GPicker value={h.grade} onChange={g=>upd({homework:homework.map(x=>x.id===h.id?{...x,grade:g}:x)})}/>
-                <span className="text-xs text-slate-400">оценка</span>
+                <span className="text-xs" style={{color:"var(--text-muted)"}}>оценка</span>
               </div>
               <div className="flex gap-2 items-end">
-                <textarea className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none" placeholder="Комментарий для ребёнка..." rows={2}
+                <textarea className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" placeholder="Комментарий для ребёнка..." rows={2}
                   value={editC[h.id]??h.comment} onChange={e=>setEditC(p=>({...p,[h.id]:e.target.value}))}/>
                 <button onClick={()=>{upd({homework:homework.map(x=>x.id===h.id?{...x,comment:editC[h.id]??h.comment}:x)});setEditC(p=>({...p,[h.id]:undefined}));}}
                   className="bg-amber-400 text-white rounded-lg px-3 py-1.5 text-xs mb-0.5">💾</button>
@@ -75,7 +76,7 @@ export default function HomeworkTab({
           const patch={homework:homework.filter(x=>x.id!==h.id)};
           if(h.grade)patch.grades=[...(grades||[]),{id:uid(),childId,subjectId:h.subjectId,value:h.grade,date:h.date||'',type:'hw',comment:''}];
           upd(patch);
-        }} className="text-slate-300 hover:text-red-400 text-lg">×</button>}
+        }} className="hover:text-red-400 text-lg" style={{color:"var(--text-ghost)"}}>×</button>}
       </div>
     </Card>
     </div>
@@ -91,7 +92,8 @@ export default function HomeworkTab({
             {doneHw.length > 0 && (
               <div className="mt-2">
                 <button onClick={()=>setShowDoneHw(v=>!v)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-100 text-slate-500 text-xs font-medium hover:bg-slate-200">
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium"
+                  style={{background:"var(--bg-card-done)",color:"var(--text-muted)"}}>
                   <span>✓ Выполнено и просроченное ({doneHw.length})</span>
                   <span style={{transform:showDoneHw?"rotate(0)":"rotate(-90deg)",transition:"transform 0.15s",display:"inline-block"}}>⌄</span>
                 </button>
@@ -118,9 +120,11 @@ export default function HomeworkTab({
                 </Sel>
                 <div className="flex gap-1">
                   <button onClick={()=>setHomeworkForm(p=>({...p,hwType:"hw"}))}
-                    className={`px-3 py-2 rounded-lg text-sm border-2 transition-all ${homeworkForm.hwType!=="kr"?"bg-blue-500 text-white border-blue-500":"bg-white text-slate-500 border-slate-200"}`}>📝</button>
+                    className={`px-3 py-2 rounded-lg text-sm border-2 transition-all ${homeworkForm.hwType!=="kr"?"bg-indigo-500 text-white border-indigo-500":"border-[var(--border)]"}`}
+                    style={homeworkForm.hwType==="kr"?{background:"var(--bg-card)",color:"var(--text-secondary)"}:{}}>📝</button>
                   <button onClick={()=>setHomeworkForm(p=>({...p,hwType:"kr"}))}
-                    className={`px-3 py-2 rounded-lg text-sm border-2 transition-all ${homeworkForm.hwType==="kr"?"bg-red-500 text-white border-red-500":"bg-white text-slate-500 border-slate-200"}`}>🚨</button>
+                    className={`px-3 py-2 rounded-lg text-sm border-2 transition-all ${homeworkForm.hwType==="kr"?"bg-red-500 text-white border-red-500":"border-[var(--border)]"}`}
+                    style={homeworkForm.hwType!=="kr"?{background:"var(--bg-card)",color:"var(--text-secondary)"}:{}}>🚨</button>
                 </div>
               </div>
               <Sel cls="w-full" value={homeworkForm.lessonId} onChange={e=>{
@@ -134,7 +138,7 @@ export default function HomeworkTab({
                 })}
               </Sel>
               <div className="flex gap-2 items-end">
-                <textarea className="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                <textarea className="border border-[var(--border)] rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
                   placeholder={homeworkForm.hwType==="kr"?"Тема КР (необязательно)":"Что задали?"} rows={2}
                   value={homeworkForm.task} onChange={e=>setHomeworkForm(p=>({...p,task:e.target.value}))}/>
                 <Btn onClick={()=>{
@@ -143,7 +147,7 @@ export default function HomeworkTab({
                   const taskText=homeworkForm.task.trim()||(homeworkForm.hwType==="kr"?"Контрольная работа":"");
                   upd({homework:[...homework,{id:uid(),childId,subjectId:homeworkForm.subjectId,date:homeworkForm.due,lessonId:homeworkForm.lessonId,task:taskText,hwType:homeworkForm.hwType||"hw",done:false,grade:null,comment:""}]});
                   setHomeworkForm(p=>({...p,lessonId:"",task:"",hwType:"hw"}));
-                }} cls="bg-blue-500 text-white hover:bg-blue-600 mb-0.5">+</Btn>
+                }} cls="bg-indigo-500 text-white hover:bg-indigo-600 mb-0.5">+</Btn>
               </div>
             </div>
           )}
