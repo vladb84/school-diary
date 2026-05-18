@@ -128,12 +128,12 @@ export default function ScheduleTab({
           const hasClub=chCl.some(c=>c.day===DAYS[i]);
           return(
             <button key={i} onClick={()=>setActiveDate(dstr)}
-              className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-indigo-500 text-white shadow-md":isToday?"bg-blue-100 text-blue-700 border-2 border-blue-300":"card hover:bg-white/5"}`}
+              className={`flex-shrink-0 flex flex-col items-center w-12 py-2 rounded-xl text-xs font-bold transition-all ${isActive?"bg-indigo-500 text-white shadow-md":isToday?"bg-indigo-500 text-white border-2 border-indigo-500":"card hover:bg-white/5"}`}
               style={(!isActive&&!isToday)?{color:"var(--text-secondary)"}:undefined}>
               <span>{DAYS[i]}</span>
-              <span className={`text-xs font-normal mt-0.5 ${isActive?"text-blue-100":isToday?"text-blue-600":""}`} style={(!isActive&&!isToday)?{color:"var(--text-muted)"}:undefined}>{d.getDate()}</span>
+              <span className={`text-xs font-normal mt-0.5 ${isActive?"text-white/80":isToday?"text-indigo-400":""}`} style={(!isActive&&!isToday)?{color:"var(--text-muted)"}:undefined}>{d.getDate()}</span>
               <div className="flex gap-0.5 mt-1 justify-center">
-                {has&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-blue-200":"bg-blue-400"}`}/>}
+                {has&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-white/30":"bg-white/60"}`}/>}
                 {hasKR&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-red-300":"bg-red-500"}`}/>}
                 {hasClub&&<span className={`w-1.5 h-1.5 rounded-full ${isActive?"bg-green-300":"bg-green-500"}`}/>}
               </div>
@@ -150,7 +150,7 @@ export default function ScheduleTab({
             )}
           </h2>
           <div className="flex items-center gap-2">
-            {activeDate===todayStr&&<span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Сегодня</span>}
+            {activeDate===todayStr&&<span className="text-xs px-2 py-0.5 rounded-full" style={{background:"var(--bg-tag)",color:"var(--accent-text)"}}>Сегодня</span>}
             {isSunday&&<span className="text-xs px-2 py-0.5 rounded-full" style={{background:"var(--bg-card-done)",color:"var(--text-secondary)"}}>Выходной</span>}
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function ScheduleTab({
           if(krToday.length>0)return(
             <div className="mb-3 space-y-1">
               {krToday.map(h=>{const s=subj(h.subjectId);return(
-                <div key={h.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 border-2 border-red-300 ${h.done?"opacity-40":""}`}>
+                <div key={h.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 ${h.done?"opacity-40":""}`} style={{background:"rgba(239,68,68,0.15)",borderColor:"var(--danger-text)"}}>
                   <span className="text-sm">🚨</span>
                   <span className="text-sm font-bold text-red-600">КР сегодня:</span>
                   <span className={`px-2 py-0.5 rounded-lg text-sm font-medium ${sc(s)}`}>{s?.name||"?"}</span>
@@ -250,7 +250,7 @@ export default function ScheduleTab({
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {l.lessonNum>0&&<span className="text-xs font-bold w-4 text-center" style={{color:"var(--text-ghost)"}}>{l.lessonNum}</span>}
                                 <span className="text-sm font-medium line-through flex-1" style={{color:"var(--text-muted)"}}>{s?.name||"?"}</span>
-                                <span className="text-xs bg-blue-50 text-blue-400 border border-blue-200 rounded-full px-2 py-0.5">перенесён → {l._moveEntry?.lessonNum} ур.</span>
+                                <span className="text-xs border rounded-full px-2 py-0.5" style={{background:"var(--bg-tag)",color:"var(--accent-text)",borderColor:"var(--border-active)"}}>перенесён → {l._moveEntry?.lessonNum} ур.</span>
                               </div>
                             ):isCancelled?(
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -272,7 +272,7 @@ export default function ScheduleTab({
                                 <span className="text-xs line-through" style={{color:"var(--text-muted)"}}>{origTime}</span>
                                 <span className="text-xs" style={{color:"var(--text-ghost)"}}>→</span>
                                 <span className="text-sm font-medium flex-1" style={{color:"var(--text-primary)"}}>{s?.name||"?"}</span>
-                                <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-full px-2 py-0.5">перенос</span>
+                                <span className="text-xs border rounded-full px-2 py-0.5" style={{background:"var(--bg-tag)",color:"var(--accent-text)",borderColor:"var(--border-active)"}}>перенос</span>
                               </div>
                             ):isExtra?(
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -301,11 +301,13 @@ export default function ScheduleTab({
                                 {subAction===null&&(
                                   <div className="flex gap-1.5 flex-wrap">
                                     <button onClick={e=>{e.stopPropagation();doCancel(l);}}
-                                      className="text-xs px-2.5 py-1 rounded-full border border-red-200 bg-red-50 text-red-500 hover:bg-red-100">
+                                      className="text-xs px-2.5 py-1 rounded-full border"
+                                      style={{background:"rgba(239,68,68,0.15)",color:"var(--danger-text)",borderColor:"var(--danger-text)"}}>
                                       🚫 Отменить
                                     </button>
                                     <button onClick={e=>{e.stopPropagation();setSubAction('replace');}}
-                                      className="text-xs px-2.5 py-1 rounded-full border border-green-200 bg-green-50 text-green-600 hover:bg-green-100">
+                                      className="text-xs px-2.5 py-1 rounded-full border"
+                                      style={{background:"rgba(34,197,94,0.15)",color:"var(--success-text)",borderColor:"var(--success)"}}>
                                       🔄 Заменить
                                     </button>
                                     <button onClick={e=>{e.stopPropagation();setSubAction('move');}}
@@ -399,7 +401,7 @@ export default function ScheduleTab({
                             {!isCancelled&&hwChips.length>0&&(
                               <div className="flex flex-wrap gap-1 mt-2 items-center">
                                 {hwChips.map(hw=>(
-                                  <div key={hw.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${hw.done?"bg-green-50 border-green-200 text-green-700 line-through":"bg-blue-50 border-blue-200 text-blue-700"}`}>
+                                  <div key={hw.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${hw.done?"line-through":""}`} style={hw.done?{background:"rgba(34,197,94,0.15)",color:"var(--success-text)",borderColor:"var(--success)"}:{background:"var(--bg-tag)",color:"var(--accent-text)",borderColor:"var(--border-active)"}}>
                                     <span className="max-w-[120px] truncate">{hw.task?.slice(0,25)}</span>
                                     {isOwner&&<button onClick={e=>{e.stopPropagation();const patch={homework:(homework||[]).filter(x=>x.id!==hw.id)};if(hw.grade)patch.grades=[...(grades||[]),{id:uid(),childId,subjectId:hw.subjectId,value:hw.grade,date:hw.date||'',type:'hw',comment:''}];upd(patch);}} className="hover:text-red-400 ml-0.5" style={{color:"var(--text-muted)"}}>×</button>}
                                   </div>
@@ -463,7 +465,7 @@ export default function ScheduleTab({
           <CollapseBtn open={showAddLesson} onToggle={()=>setShowAddLesson(v=>!v)} label="Добавить урок"/>
           {showAddLesson&&(
             <div className="mt-3 space-y-2">
-              {gSubjs&&<p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-1.5">🎓 Предметы для {activeCh?.grade} класса</p>}
+              {gSubjs&&<p className="text-xs rounded-lg px-3 py-1.5" style={{color:"var(--accent-text)",background:"var(--bg-tag)"}}>🎓 Предметы для {activeCh?.grade} класса</p>}
               <Sel cls="w-full" value={lessonForm.subjectId} onChange={e=>setLessonForm(p=>({...p,subjectId:e.target.value}))}>
                 <option value="">Выберите предмет...</option>
                 {availSubjNames.map(name=>{const s=subjects.find(x=>x.name===name);return <option key={name} value={s?.id||"__new__"+name}>{name}</option>;})}
