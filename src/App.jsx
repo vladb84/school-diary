@@ -385,7 +385,7 @@ export default function App(){
   // ── Экраны входа ────────────────────────────────────────────────────────────
   if(step==="login")return(
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
-      <div className="bg-white rounded-3xl shadow-lg p-10 max-w-sm w-full text-center">
+      <div className="card rounded-3xl p-10 max-w-sm w-full text-center">
         <div className="text-6xl mb-4">📚</div>
         <h1 className="text-2xl font-bold mb-2" style={{color:"var(--text-primary)"}}>Школьный дневник</h1>
         <p className="text-sm mb-6" style={{color:"var(--text-muted)"}}>Планировщик для всей семьи</p>
@@ -394,13 +394,13 @@ export default function App(){
           Войти через Google
         </button>
         <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1 h-px bg-slate-200"/>
-          <span className="text-xs text-slate-400">или</span>
-          <div className="flex-1 h-px bg-slate-200"/>
+          <div className="flex-1 h-px" style={{background:"var(--border)"}}/>
+          <span className="text-xs" style={{color:"var(--text-muted)"}}>или</span>
+          <div className="flex-1 h-px" style={{background:"var(--border)"}}/>
         </div>
         {phoneStep==="input"?(
           <div className="space-y-2 text-left">
-            <Inp className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="+7 999 123-45-67" value={phoneNum}
+            <Inp className="inp w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="+7 999 123-45-67" value={phoneNum}
               onChange={e=>{setPhoneNum(e.target.value);setPhoneErr("");}}
               onKeyDown={e=>e.key==="Enter"&&sendSms()}/>
             {phoneErr&&<p className="text-red-500 text-xs">{phoneErr}</p>}
@@ -412,8 +412,8 @@ export default function App(){
           </div>
         ):(
           <div className="space-y-2">
-            <p className="text-xs text-slate-500 text-center">Код из SMS на номер {phoneNum}</p>
-            <Inp className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] focus:outline-none focus:border-blue-400 text-slate-800 w-full"
+            <p className="text-xs text-center" style={{color:"var(--text-secondary)"}}>Код из SMS на номер {phoneNum}</p>
+            <Inp className="inp w-full rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] focus:outline-none focus:border-blue-400"
               placeholder="123456" maxLength={6} value={phoneCode} autoFocus
               onChange={e=>{setPhoneCode(e.target.value);setPhoneErr("");}}
               onKeyDown={e=>e.key==="Enter"&&confirmSms()}/>
@@ -422,39 +422,39 @@ export default function App(){
               className="w-full bg-slate-800 text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-all">
               {phoneLoading?"Проверяем...":"Подтвердить →"}
             </button>
-            <button onClick={()=>{setPhoneStep("input");setPhoneCode("");setPhoneErr("");}} className="w-full text-slate-400 text-xs hover:text-slate-600">← Изменить номер</button>
+            <button onClick={()=>{setPhoneStep("input");setPhoneCode("");setPhoneErr("");}} className="w-full text-xs" style={{color:"var(--text-muted)"}}>← Изменить номер</button>
           </div>
         )}
-        <p className="text-xs text-slate-300 mt-4">Данные сохраняются в облаке</p>
+        <p className="text-xs mt-4" style={{color:"var(--text-muted)"}}>Данные сохраняются в облаке</p>
       </div>
     </div>
   );
 
   if(step==="setup")return(
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
-      <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
-        <div className="text-center mb-6"><div className="text-5xl mb-3">👋</div><h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Добро пожаловать!</h1><p className="text-slate-400 text-sm mt-1">{user.email||user.phoneNumber}</p></div>
+      <div className="card rounded-3xl p-8 max-w-sm w-full">
+        <div className="text-center mb-6"><div className="text-5xl mb-3">👋</div><h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Добро пожаловать!</h1><p className="text-sm mt-1" style={{color:"var(--text-muted)"}}>{user.email||user.phoneNumber}</p></div>
         <div className="space-y-3">
           <button onClick={createFamily} disabled={codeLoading} className="w-full bg-blue-500 text-white rounded-xl px-6 py-4 text-sm font-medium hover:bg-blue-600 disabled:opacity-60 transition-all">{codeLoading?"Создаём...":"👨‍👩‍👧‍👦 Я родитель — создать семью"}</button>
-          <button onClick={()=>setStep("join")} className="w-full bg-white border-2 border-slate-200 text-slate-700 rounded-xl px-6 py-4 text-sm font-medium hover:bg-slate-50 transition-all">🎒 Я ребёнок — войти по коду</button>
+          <button onClick={()=>setStep("join")} className="card border-2 border-[var(--border)] w-full rounded-xl px-6 py-4 text-sm font-medium transition-all" style={{color:"var(--text-primary)"}}>🎒 Я ребёнок — войти по коду</button>
         </div>
-        <button onClick={logout} className="w-full text-slate-300 text-xs mt-4 hover:text-slate-400">Выйти</button>
+        <button onClick={logout} className="w-full text-xs mt-4" style={{color:"var(--text-muted)"}}>Выйти</button>
       </div>
     </div>
   );
 
   if(step==="join")return(
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
-      <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
-        <button onClick={()=>setStep("setup")} className="text-slate-400 text-sm mb-4 hover:text-slate-600">← Назад</button>
-        <div className="text-center mb-6"><div className="text-5xl mb-3">🔑</div><h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Войти в семью</h1><p className="text-slate-400 text-sm mt-1">Попроси родителя назвать код</p></div>
-        <input className={`w-full border-2 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] uppercase focus:outline-none mb-2 ${codeErr?"border-red-400 text-red-500":"border-slate-200 focus:border-blue-400 text-slate-800"}`}
+      <div className="card rounded-3xl p-8 max-w-sm w-full">
+        <button onClick={()=>setStep("setup")} className="text-sm mb-4" style={{color:"var(--text-muted)"}}>← Назад</button>
+        <div className="text-center mb-6"><div className="text-5xl mb-3">🔑</div><h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Войти в семью</h1><p className="text-sm mt-1" style={{color:"var(--text-muted)"}}>Попроси родителя назвать код</p></div>
+        <input className={`inp w-full border-2 rounded-xl px-4 py-4 text-center text-2xl font-bold tracking-[0.3em] uppercase focus:outline-none mb-2 ${codeErr?"border-red-400 text-red-500":"border-[var(--border)] focus:border-blue-400"}`}
           placeholder="ABC123" maxLength={6} value={codeInput} autoFocus
           onChange={e=>{setCodeInput(e.target.value.toUpperCase());setCodeErr("");}}
           onKeyDown={e=>e.key==="Enter"&&joinFamily()}/>
         {codeErr&&<p className="text-red-500 text-xs text-center mb-3">{codeErr}</p>}
         <button onClick={joinFamily} disabled={codeLoading||codeInput.length<6} className="w-full bg-blue-500 text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-blue-600 disabled:opacity-50 mt-2 transition-all">{codeLoading?"Проверяем...":"Войти →"}</button>
-        <button onClick={logout} className="w-full text-slate-300 text-xs mt-4 hover:text-slate-400">Выйти</button>
+        <button onClick={logout} className="w-full text-xs mt-4" style={{color:"var(--text-muted)"}}>Выйти</button>
       </div>
     </div>
   );
@@ -474,12 +474,12 @@ export default function App(){
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{background:"var(--bg-gradient)"}}>
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-2" style={{color:"var(--text-primary)"}}>👋 Привет!</h1>
-        <p className="text-slate-400">Выбери свой профиль</p>
-        <p className="text-xs text-slate-300 mt-1">{user.email||user.phoneNumber}</p>
+        <p style={{color:"var(--text-muted)"}}>Выбери свой профиль</p>
+        <p className="text-xs mt-1" style={{color:"var(--text-muted)"}}>{user.email||user.phoneNumber}</p>
         {isOwner&&<span className="inline-block mt-2 bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full">👨‍👩‍👧‍👦 Родитель</span>}
       </div>
       {children.length===0
-        ?<div className="bg-white rounded-2xl p-8 shadow-sm text-center max-w-xs w-full mb-6"><p className="text-slate-400 text-sm">{isOwner?"Добавьте детей в разделе «Семья».":"Попросите родителя добавить ваш профиль."}</p></div>
+        ?<div className="card rounded-2xl p-8 text-center max-w-xs w-full mb-6"><p className="text-sm" style={{color:"var(--text-muted)"}}>{isOwner?"Добавьте детей в разделе «Семья».":"Попросите родителя добавить ваш профиль."}</p></div>
         :<div className="grid grid-cols-2 gap-4 max-w-sm w-full mb-6">
           {children.map(ch=>(
             <button key={ch.id} onClick={()=>selectProfile(ch)} className="card p-6 flex flex-col items-center gap-3 active:scale-95 transition-all">
@@ -492,11 +492,11 @@ export default function App(){
       }
       <div className="flex flex-col items-center gap-3 w-full max-w-xs">
         {isOwner&&(<>
-          <button onClick={()=>setShowCode(v=>!v)} className="w-full bg-white border border-slate-200 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">{showCode?"Скрыть код":"🔑 Показать код для детей"}</button>
+          <button onClick={()=>setShowCode(v=>!v)} className="w-full card border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm font-medium" style={{color:"var(--text-secondary)"}}>{showCode?"Скрыть код":"🔑 Показать код для детей"}</button>
           {showCode&&(<div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 text-center"><p className="text-xs text-amber-600 mb-1">Код семьи:</p><p className="text-3xl font-bold tracking-[0.2em] text-amber-800">{dbData.familyCode}</p><p className="text-xs text-amber-500 mt-1">Вводится один раз при первом входе</p></div>)}
           <button onClick={()=>{setStep("app");setTab(6);}} className="w-full bg-amber-100 text-amber-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-amber-200">⚙️ Управление семьёй</button>
         </>)}
-        <button onClick={logout} className="text-slate-300 text-xs hover:text-slate-400">Выйти из аккаунта</button>
+        <button onClick={logout} className="text-xs" style={{color:"var(--text-muted)"}}>Выйти из аккаунта</button>
       </div>
     </div>
   );
